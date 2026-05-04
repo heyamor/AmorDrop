@@ -1,0 +1,8 @@
+.build/
+dist/
+.DS_Store
+xcuserdata/
+*.xcworkspace
+.swiftpm/
+Packages/
+scripts/.sparkle-public-key
