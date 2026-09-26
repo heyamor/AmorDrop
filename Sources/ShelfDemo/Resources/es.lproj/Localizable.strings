@@ -1,20 +1,20 @@
 /* Spanish (es) translations */
 
 "Settings" = "Ajustes";
-"Shelf Settings" = "Ajustes de Dropshit";
+"Shelf Settings" = "Ajustes de AmorDrop";
 "Auto-delete shelves" = "Eliminar estantes automáticamente";
 "Never" = "Nunca";
 "After 1 day" = "Después de 1 día";
 "After 7 days" = "Después de 7 días";
 "After 10 days" = "Después de 10 días";
 "After 30 days" = "Después de 30 días";
-"settings.expiry.description" = "Un estante se elimina cuando su última actividad supera la duración elegida. Los archivos arrastrados desde el Finder se mantienen en disco; solo se eliminan los archivos creados dentro del estante (p. ej. imágenes del portapapeles). Los estantes fijados nunca se eliminan automáticamente.";
+"settings.expiry.description" = "Al caducar, solo se eliminan las entradas. Todos los archivos se conservan en disco. Los estantes fijados nunca caducan.";
 "Park new shelves at the top-right corner" = "Aparcar nuevos estantes en la esquina superior derecha";
 "settings.park.description" = "Tras el primer elemento añadido a un estante recién creado, el estante se desplaza a la esquina superior derecha y se aparta. Los nuevos estantes se apilan verticalmente debajo.";
 "Collapse expanded shelf when clicking outside" = "Contraer estante expandido al hacer clic fuera";
 "settings.collapse.description" = "Cuando un estante está en vista detallada y haces clic en otro lugar, se pliega a una pequeña píldora. La píldora se mantiene — los estantes contraídos no se ven afectados.";
 "Launch at login" = "Abrir al iniciar sesión";
-"settings.launch.description" = "Inicia Dropshit automáticamente al iniciar sesión. Instalamos un LaunchAgent en ~/Library/LaunchAgents — funciona tanto con compilaciones empaquetadas como con builds de desarrollo sin firmar.";
+"settings.launch.description" = "Inicia AmorDrop automáticamente al iniciar sesión. Instalamos un LaunchAgent en ~/Library/LaunchAgents — funciona tanto con compilaciones empaquetadas como con builds de desarrollo sin firmar.";
 "Couldn't Update Login Items" = "No se han podido actualizar los ítems de inicio";
 
 "Language" = "Idioma";
@@ -42,11 +42,6 @@
 "Settings…" = "Ajustes…";
 "Quit" = "Salir";
 
-/* Auto-update */
-"Check for Updates…" = "Buscar actualizaciones…";
-"Updates" = "Actualizaciones";
-"Automatically check for updates" = "Buscar actualizaciones automáticamente";
-"settings.updates.description" = "Dropshit busca nuevas versiones en segundo plano una vez al día. Las nuevas versiones se descargan, verifican e instalan al hacer clic en «Instalar y reiniciar».";
 
 "Open With" = "Abrir con";
 "Show in Finder" = "Mostrar en el Finder";

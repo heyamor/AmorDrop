@@ -230,72 +230,11 @@ private final class ShelfActionTargets: NSObject {
         panel.canCreateDirectories = true
         guard panel.runModal() == .OK, let dest = panel.url else { return }
 
-        try? FileManager.default.removeItem(at: dest)
-
-        // Stage the sources by hard-link (falls back to copy) into a temp dir,
-        // then run `zip -r` from that dir using basenames. This sidesteps
-        // `zip -j` path-junk warnings and avoids any TCC surprises from
-        // spawning zip with absolute paths into protected folders.
-        let staging = FileManager.default.temporaryDirectory
-            .appendingPathComponent("Shelf-zip-\(UUID().uuidString)")
-
-        do {
-            try FileManager.default.createDirectory(at: staging, withIntermediateDirectories: true)
-        } catch {
-            Self.showZipError(String(format: L("alert.zip.staging-failed"), error.localizedDescription))
-            return
-        }
-
-        var basenames: [String] = []
-        var seen: Set<String> = []
-        for src in urls {
-            let name = Self.uniqueName(for: src.lastPathComponent, in: &seen)
-            let link = staging.appendingPathComponent(name)
-            do {
-                try FileManager.default.linkItem(at: src, to: link)
-            } catch {
-                // Fall back to copy for cross-volume or permission cases.
-                do {
-                    try FileManager.default.copyItem(at: src, to: link)
-                } catch {
-                    Self.showZipError(String(format: L("alert.zip.stage-failed"), src.lastPathComponent, error.localizedDescription))
-                    try? FileManager.default.removeItem(at: staging)
-                    return
-                }
-            }
-            basenames.append(name)
-        }
-
         Task.detached {
-            let process = Process()
-            process.executableURL = URL(fileURLWithPath: "/usr/bin/zip")
-            process.currentDirectoryURL = staging
-            process.arguments = ["-r", dest.path] + basenames
-
-            let errPipe = Pipe()
-            process.standardError = errPipe
-            process.standardOutput = Pipe()
-
             do {
-                try process.run()
+                try ZipArchive.create(sources: urls, destination: dest)
             } catch {
-                try? FileManager.default.removeItem(at: staging)
-                await Self.showZipError(String(format: L("alert.zip.launch-failed"), error.localizedDescription))
-                return
-            }
-            process.waitUntilExit()
-
-            let errData = errPipe.fileHandleForReading.readDataToEndOfFile()
-            let errText = String(data: errData, encoding: .utf8)?
-                .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
-            let status = process.terminationStatus
-            try? FileManager.default.removeItem(at: staging)
-
-            if status != 0 {
-                let detail = errText.isEmpty
-                    ? String(format: L("alert.zip.exit-status"), Int(status))
-                    : errText
-                await Self.showZipError(detail)
+                await Self.showZipError(error.localizedDescription)
             }
         }
     }
@@ -307,26 +246,6 @@ private final class ShelfActionTargets: NSObject {
         alert.informativeText = detail
         alert.alertStyle = .warning
         alert.runModal()
-    }
-
-    private static func uniqueName(for name: String, in seen: inout Set<String>) -> String {
-        var candidate = name
-        if !seen.contains(candidate) {
-            seen.insert(candidate)
-            return candidate
-        }
-        let url = URL(fileURLWithPath: name)
-        let stem = url.deletingPathExtension().lastPathComponent
-        let ext = url.pathExtension
-        var i = 2
-        while true {
-            candidate = ext.isEmpty ? "\(stem) \(i)" : "\(stem) \(i).\(ext)"
-            if !seen.contains(candidate) {
-                seen.insert(candidate)
-                return candidate
-            }
-            i += 1
-        }
     }
 
     @objc func copyPath() {

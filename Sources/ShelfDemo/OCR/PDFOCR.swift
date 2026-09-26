@@ -90,7 +90,7 @@ enum PDFOCR {
     }
 
     /// Rebuild a searchable copy of `source` next to it as
-    /// `<stem> (searchable).pdf`. Falls back to `~/Library/Caches/Dropshit/OCR/`
+    /// `<stem> (searchable).pdf`. Falls back to `~/Library/Caches/AmorDrop/OCR/`
     /// when the source directory is read-only.
     static func makeSearchable(
         source: URL,
@@ -261,7 +261,7 @@ enum PDFOCR {
                 in: .userDomainMask,
                 appropriateFor: nil,
                 create: true
-            ).appendingPathComponent("Dropshit/OCR", isDirectory: true)
+            ).appendingPathComponent("AmorDrop/OCR", isDirectory: true)
             try FileManager.default.createDirectory(
                 at: cache, withIntermediateDirectories: true
             )

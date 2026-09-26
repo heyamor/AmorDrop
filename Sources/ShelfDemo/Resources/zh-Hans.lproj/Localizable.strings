@@ -1,20 +1,20 @@
 /* Chinese, Simplified (zh-Hans) translations */
 
 "Settings" = "设置";
-"Shelf Settings" = "Dropshit 设置";
+"Shelf Settings" = "AmorDrop 设置";
 "Auto-delete shelves" = "自动删除搁架";
 "Never" = "从不";
 "After 1 day" = "1 天后";
 "After 7 days" = "7 天后";
 "After 10 days" = "10 天后";
 "After 30 days" = "30 天后";
-"settings.expiry.description" = "当搁架的最近活动时间超过所选时长时,会被自动删除。从 Finder 拖入的文件会保留在磁盘上;只有放入搁架内部的文件(如剪贴板图片)才会被删除。已固定的搁架不会被自动删除。";
+"settings.expiry.description" = "搁架到期后只移除条目，所有文件仍保留在磁盘上。已固定的搁架不会自动到期。";
 "Park new shelves at the top-right corner" = "将新搁架停靠到右上角";
 "settings.park.description" = "当第一项内容落到新建搁架后,搁架会向上滑动到屏幕右上角让出位置。新搁架会在其下方垂直堆叠。";
 "Collapse expanded shelf when clicking outside" = "点击外部时收起展开的搁架";
 "settings.collapse.description" = "当搁架处于展开详情视图,你点击其他位置时,它会折叠回小药丸状态。药丸保持原位 — 已收起的搁架不会受影响。";
 "Launch at login" = "登录时启动";
-"settings.launch.description" = "登录时自动启动 Dropshit。我们会在 ~/Library/LaunchAgents 中安装一个 LaunchAgent — 对打包版本和未签名的开发版本都有效。";
+"settings.launch.description" = "登录时自动启动 AmorDrop。我们会在 ~/Library/LaunchAgents 中安装一个 LaunchAgent — 对打包版本和未签名的开发版本都有效。";
 "Couldn't Update Login Items" = "无法更新登录项";
 
 "Language" = "语言";
@@ -42,11 +42,6 @@
 "Settings…" = "设置…";
 "Quit" = "退出";
 
-/* Auto-update */
-"Check for Updates…" = "检查更新…";
-"Updates" = "更新";
-"Automatically check for updates" = "自动检查更新";
-"settings.updates.description" = "Dropshit 每天在后台检查一次新版本。点击\"安装并重新启动\"后，新版本会被下载、验证并安装。";
 
 "Open With" = "打开方式";
 "Show in Finder" = "在 Finder 中显示";

@@ -54,16 +54,11 @@ final class ShakeDetector {
     private func handle(_ event: NSEvent) {
         switch event.type {
         case .leftMouseUp:
-            samples.removeAll()
+            endDrag()
         case .leftMouseDragged:
             let now = CACurrentMediaTime()
             let x = NSEvent.mouseLocation.x
-            samples.append(Sample(time: now, x: x))
-            samples.removeAll { now - $0.time > window }
-            if detectShake() {
-                guard now - lastShakeTime > cooldown else { return }
-                lastShakeTime = now
-                samples.removeAll()
+            if recordDrag(x: x, at: now) {
                 DispatchQueue.main.async { [weak self] in
                     self?.onShake?()
                 }
@@ -71,6 +66,20 @@ final class ShakeDetector {
         default:
             break
         }
+    }
+
+    /// The event monitor and deterministic gesture tests share this path.
+    func recordDrag(x: CGFloat, at now: CFTimeInterval) -> Bool {
+        samples.append(Sample(time: now, x: x))
+        samples.removeAll { now - $0.time > window }
+        guard detectShake(), now - lastShakeTime > cooldown else { return false }
+        lastShakeTime = now
+        samples.removeAll()
+        return true
+    }
+
+    func endDrag() {
+        samples.removeAll()
     }
 
     private func detectShake() -> Bool {

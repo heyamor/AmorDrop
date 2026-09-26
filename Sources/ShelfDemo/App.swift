@@ -1,7 +1,6 @@
 import AppKit
 import Combine
 import IOKit.pwr_mgt
-import Sparkle
 import SwiftUI
 
 @main
@@ -16,8 +15,15 @@ struct ShelfDemoApp {
 
         let delegate = AppDelegate()
         app.delegate = delegate
+        if ProcessInfo.processInfo.environment["AMORDROP_DIAGNOSTICS"] == "1" {
+            NSLog("AmorDrop: entering application event loop")
+        }
 
-        app.run()
+        // NSApplication's delegate is weak. Keep it alive for the complete
+        // event loop, including optimized Release builds.
+        withExtendedLifetime(delegate) {
+            app.run()
+        }
     }
 }
 
@@ -26,6 +32,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let manager = ShelfManager()
     private let shakeDetector = ShakeDetector()
+    private let summonHotKey = GlobalHotKey()
 
     // One panel per shelf.
     private var panels: [UUID: FloatingPanel<ShelfContainerView>] = [:]
@@ -52,9 +59,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var ocrCompletedSearchableCancellable: AnyCancellable?
     private var ocrCompletedExtractedCancellable: AnyCancellable?
     private var ocrFailedCancellable: AnyCancellable?
-
-    // Sparkle-driven auto-update — owns SPUStandardUpdaterController.
-    private let updateController = UpdateController()
 
     // Duplicate-drop toast.
     private var duplicateToastCancellable: AnyCancellable?
@@ -192,7 +196,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Lifecycle
 
     func applicationDidFinishLaunching(_ notification: Notification) {
+        if ProcessInfo.processInfo.environment["AMORDROP_DIAGNOSTICS"] == "1" {
+            NSLog("AmorDrop: initializing menu bar and global shortcut")
+        }
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
+        statusItem.button?.setAccessibilityLabel("AmorDrop")
+        statusItem.button?.toolTip = "AmorDrop"
         applyStatusIcon(dropping: false)
         // Flip the glyph while any panel is being targeted by a drop so the
         // menubar mirrors the "ready to receive" state visually.
@@ -207,6 +216,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
         shakeDetector.onShake = { [weak self] in self?.handleShake() }
         shakeDetector.start()
+        summonHotKey.start { [weak self] in self?.newShelfAction() }
+        if ProcessInfo.processInfo.environment["AMORDROP_DIAGNOSTICS"] == "1" {
+            NSLog("AmorDrop: menu bar button created: %@", String(statusItem.button != nil))
+        }
 
         QuickLookController.shared.urlsProvider = { [weak self] in
             self?.urlsForKeyPanel() ?? []
@@ -366,17 +379,6 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         settings.target = self
         menu.addItem(settings)
 
-        // Wire the menu item directly to SPUStandardUpdaterController so AppKit's
-        // responder chain calls its `validateMenuItem(_:)` — the item auto-grays
-        // out while a check or download is already in flight.
-        let checkUpdates = NSMenuItem(
-            title: L("Check for Updates…"),
-            action: #selector(SPUStandardUpdaterController.checkForUpdates(_:)),
-            keyEquivalent: ""
-        )
-        checkUpdates.target = updateController.updaterController
-        menu.addItem(checkUpdates)
-
         let quit = NSMenuItem(
             title: L("Quit"),
             action: #selector(NSApp.terminate(_:)),
@@ -409,7 +411,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 let result = IOPMAssertionCreateWithName(
                     kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
                     IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                    "Dropshit keep-awake" as CFString,
+                    "AmorDrop keep-awake" as CFString,
                     &assertion
                 )
                 guard result == kIOReturnSuccess else { return }
@@ -605,8 +607,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     @objc private func newShelfAction() {
+        if ProcessInfo.processInfo.environment["AMORDROP_DIAGNOSTICS"] == "1" {
+            NSLog("AmorDrop: creating shelf")
+        }
         let shelfID = manager.createShelf()
         openPanel(for: shelfID, nearCursor: false)
+    }
+
+    func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
+        if !flag { newShelfAction() }
+        return true
     }
 
     @objc private func newShelfFromClipboardAction() {
@@ -923,7 +933,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ctx.allowsImplicitAnimation = true
             panel.animator().setFrame(frame, display: true)
         }, completionHandler: { [weak self] in
-            self?.suppressMoveCheck = false
+            Task { @MainActor [weak self] in self?.suppressMoveCheck = false }
         })
     }
 
@@ -993,7 +1003,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             ctx.allowsImplicitAnimation = true
             panel.animator().setFrame(frame, display: true)
         }, completionHandler: { [weak self] in
-            self?.suppressMoveCheck = false
+            Task { @MainActor [weak self] in self?.suppressMoveCheck = false }
         })
     }
 

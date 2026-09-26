@@ -244,9 +244,9 @@ final class DragInitiatorView: NSView, NSDraggingSource, NSFilePromiseProviderDe
             return
         }
         do {
-            if FileManager.default.fileExists(atPath: url.path) {
-                try FileManager.default.removeItem(at: url)
-            }
+            // Finder chooses the promised destination name. Never delete an
+            // existing destination: it may be the source itself or another
+            // user's file. copyItem fails safely when that path is occupied.
             try FileManager.default.copyItem(at: sourceURL, to: url)
             completionHandler(nil)
         } catch {

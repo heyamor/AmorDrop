@@ -2,20 +2,20 @@
 
 /* Settings window */
 "Settings" = "Ustawienia";
-"Shelf Settings" = "Ustawienia Dropshit";
+"Shelf Settings" = "Ustawienia AmorDrop";
 "Auto-delete shelves" = "Automatyczne usuwanie półek";
 "Never" = "Nigdy";
 "After 1 day" = "Po 1 dniu";
 "After 7 days" = "Po 7 dniach";
 "After 10 days" = "Po 10 dniach";
 "After 30 days" = "Po 30 dniach";
-"settings.expiry.description" = "Półka jest usuwana, gdy jej ostatnia aktywność jest starsza niż wybrany czas. Pliki przeciągnięte z Findera pozostają na dysku; usuwane są tylko pliki dodane wewnątrz półki (np. obrazy ze schowka). Przypięte półki nigdy nie są usuwane automatycznie.";
+"settings.expiry.description" = "Po wygaśnięciu usuwane są tylko wpisy. Wszystkie pliki pozostają na dysku. Przypięte półki nigdy nie wygasają.";
 "Park new shelves at the top-right corner" = "Parkuj nowe półki w prawym górnym rogu";
 "settings.park.description" = "Po pierwszym upuszczeniu na nową półkę, półka przesuwa się do prawego górnego rogu ekranu i schodzi z drogi. Nowe półki układają się pionowo poniżej.";
 "Collapse expanded shelf when clicking outside" = "Zwijaj rozwiniętą półkę po kliknięciu poza nią";
 "settings.collapse.description" = "Gdy półka jest w widoku rozwiniętym i klikniesz w innym miejscu, zwija się do małej pigułki. Pigułka pozostaje na miejscu — zwinięte półki nie są zmieniane.";
 "Launch at login" = "Uruchamiaj przy logowaniu";
-"settings.launch.description" = "Uruchamia Dropshit automatycznie przy logowaniu. Instalujemy LaunchAgent w ~/Library/LaunchAgents — działa zarówno z wersją pakietową, jak i niepodpisaną wersją deweloperską.";
+"settings.launch.description" = "Uruchamia AmorDrop automatycznie przy logowaniu. Instalujemy LaunchAgent w ~/Library/LaunchAgents — działa zarówno z wersją pakietową, jak i niepodpisaną wersją deweloperską.";
 "Couldn't Update Login Items" = "Nie udało się zaktualizować elementów logowania";
 
 "Language" = "Język";
@@ -43,11 +43,6 @@
 "Settings…" = "Ustawienia…";
 "Quit" = "Zakończ";
 
-/* Auto-update */
-"Check for Updates…" = "Sprawdź aktualizacje…";
-"Updates" = "Aktualizacje";
-"Automatically check for updates" = "Automatycznie sprawdzaj aktualizacje";
-"settings.updates.description" = "Dropshit sprawdza nowe wydania w tle raz dziennie. Nowe wersje są pobierane, weryfikowane i instalowane po kliknięciu „Zainstaluj i uruchom ponownie”.";
 
 "Open With" = "Otwórz w";
 "Show in Finder" = "Pokaż w Finderze";

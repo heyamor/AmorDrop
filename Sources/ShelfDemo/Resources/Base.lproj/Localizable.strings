@@ -11,7 +11,7 @@
 "After 7 days" = "After 7 days";
 "After 10 days" = "After 10 days";
 "After 30 days" = "After 30 days";
-"settings.expiry.description" = "A shelf is removed when its most recent activity is older than the chosen duration. Files dragged in from Finder are kept on disk; only files staged inside the shelf (e.g. clipboard images) are deleted. Pinned shelves are never auto-deleted regardless of this setting.";
+"settings.expiry.description" = "Shelf expiry removes entries only and keeps all files on disk. Pinned shelves never expire.";
 "Park new shelves at the top-right corner" = "Park new shelves at the top-right corner";
 "settings.park.description" = "After the first item lands on a freshly-created shelf, the shelf slides up to the top-right of the screen and out of the way. New shelves stack vertically below it.";
 "Collapse expanded shelf when clicking outside" = "Collapse expanded shelf when clicking outside";

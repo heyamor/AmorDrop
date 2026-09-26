@@ -1,5 +1,5 @@
 #!/usr/bin/env swift
-// Generates an `.iconset` directory of PNGs for the Dropshit app.
+// Generates an `.iconset` directory of PNGs for the AmorDrop app.
 // Pipe into `iconutil -c icns -o AppIcon.icns AppIcon.iconset/` to produce
 // the final .icns. Each rendition is drawn fresh at the exact pixel size
 // (rather than scaled from a master PNG) so strokes stay crisp at 16px.

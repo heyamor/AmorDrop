@@ -1,20 +1,20 @@
 /* German (de) translations */
 
 "Settings" = "Einstellungen";
-"Shelf Settings" = "Dropshit-Einstellungen";
+"Shelf Settings" = "AmorDrop-Einstellungen";
 "Auto-delete shelves" = "Regale automatisch löschen";
 "Never" = "Nie";
 "After 1 day" = "Nach 1 Tag";
 "After 7 days" = "Nach 7 Tagen";
 "After 10 days" = "Nach 10 Tagen";
 "After 30 days" = "Nach 30 Tagen";
-"settings.expiry.description" = "Ein Regal wird entfernt, wenn seine letzte Aktivität älter als die gewählte Dauer ist. Aus dem Finder gezogene Dateien bleiben auf der Festplatte; nur Dateien, die innerhalb des Regals erstellt wurden (z. B. Bilder aus der Zwischenablage), werden gelöscht. Angeheftete Regale werden nie automatisch gelöscht.";
+"settings.expiry.description" = "Beim Ablauf werden nur Regaleinträge entfernt. Alle Dateien bleiben auf der Festplatte. Angeheftete Regale laufen nie ab.";
 "Park new shelves at the top-right corner" = "Neue Regale rechts oben parken";
 "settings.park.description" = "Sobald das erste Element auf einem neuen Regal landet, gleitet das Regal nach rechts oben aus dem Weg. Neue Regale stapeln sich vertikal darunter.";
 "Collapse expanded shelf when clicking outside" = "Erweitertes Regal bei Klick außerhalb einklappen";
 "settings.collapse.description" = "Wenn ein Regal in der Detailansicht ist und du anderswo klickst, klappt es zur kleinen Pille zusammen. Die Pille bleibt — eingeklappte Regale sind nicht betroffen.";
 "Launch at login" = "Beim Anmelden öffnen";
-"settings.launch.description" = "Startet Dropshit automatisch bei der Anmeldung. Wir installieren ein LaunchAgent in ~/Library/LaunchAgents — funktioniert sowohl mit gepackten als auch unsignierten Dev-Builds.";
+"settings.launch.description" = "Startet AmorDrop automatisch bei der Anmeldung. Wir installieren ein LaunchAgent in ~/Library/LaunchAgents — funktioniert sowohl mit gepackten als auch unsignierten Dev-Builds.";
 "Couldn't Update Login Items" = "Anmeldeobjekte konnten nicht aktualisiert werden";
 
 "Language" = "Sprache";
@@ -42,11 +42,6 @@
 "Settings…" = "Einstellungen…";
 "Quit" = "Beenden";
 
-/* Auto-update */
-"Check for Updates…" = "Nach Updates suchen…";
-"Updates" = "Updates";
-"Automatically check for updates" = "Automatisch nach Updates suchen";
-"settings.updates.description" = "Dropshit sucht einmal täglich im Hintergrund nach neuen Versionen. Neue Versionen werden heruntergeladen, verifiziert und installiert, sobald Sie auf „Installieren und neu starten“ klicken.";
 
 "Open With" = "Öffnen mit";
 "Show in Finder" = "Im Finder anzeigen";

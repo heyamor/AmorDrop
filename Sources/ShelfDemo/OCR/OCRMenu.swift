@@ -7,19 +7,19 @@ import UniformTypeIdentifiers
 @MainActor
 enum OCRMenu {
     /// `Make Searchable` is offered only when every selected item is a PDF.
-    static func shouldOfferMakeSearchable(forSourceUTIs utis: [UTType]) -> Bool {
+    nonisolated static func shouldOfferMakeSearchable(forSourceUTIs utis: [UTType]) -> Bool {
         guard !utis.isEmpty else { return false }
         return utis.allSatisfy { $0.conforms(to: .pdf) }
     }
 
     /// `Extract Text` is offered when every selected item is either a PDF
     /// or one of the supported image types.
-    static func shouldOfferExtractText(forSourceUTIs utis: [UTType]) -> Bool {
+    nonisolated static func shouldOfferExtractText(forSourceUTIs utis: [UTType]) -> Bool {
         guard !utis.isEmpty else { return false }
         return utis.allSatisfy(isExtractTextEligible)
     }
 
-    private static func isExtractTextEligible(_ uti: UTType) -> Bool {
+    nonisolated private static func isExtractTextEligible(_ uti: UTType) -> Bool {
         if uti.conforms(to: .pdf) { return true }
         if uti.conforms(to: .heic) { return true }
         if uti.conforms(to: .png) { return true }

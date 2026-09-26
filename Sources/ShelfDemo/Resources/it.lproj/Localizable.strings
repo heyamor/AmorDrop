@@ -1,20 +1,20 @@
 /* Italian (it) translations */
 
 "Settings" = "Impostazioni";
-"Shelf Settings" = "Impostazioni Dropshit";
+"Shelf Settings" = "Impostazioni AmorDrop";
 "Auto-delete shelves" = "Elimina automaticamente le mensole";
 "Never" = "Mai";
 "After 1 day" = "Dopo 1 giorno";
 "After 7 days" = "Dopo 7 giorni";
 "After 10 days" = "Dopo 10 giorni";
 "After 30 days" = "Dopo 30 giorni";
-"settings.expiry.description" = "Una mensola viene rimossa quando l’ultima attività è più vecchia della durata scelta. I file trascinati dal Finder restano sul disco; vengono eliminati solo i file aggiunti all’interno della mensola (es. immagini dagli Appunti). Le mensole bloccate non vengono mai eliminate automaticamente.";
+"settings.expiry.description" = "Alla scadenza vengono rimosse solo le voci. Tutti i file restano sul disco. Le mensole bloccate non scadono mai.";
 "Park new shelves at the top-right corner" = "Parcheggia le nuove mensole in alto a destra";
 "settings.park.description" = "Dopo il primo elemento aggiunto a una mensola appena creata, la mensola scivola in alto a destra dello schermo per non essere d’impiccio. Le nuove mensole si impilano verticalmente sotto.";
 "Collapse expanded shelf when clicking outside" = "Riduci la mensola espansa al clic fuori";
 "settings.collapse.description" = "Quando una mensola è in vista dettagliata e fai clic altrove, si ripiega in una piccola pillola. La pillola resta — le mensole ridotte non vengono toccate.";
 "Launch at login" = "Avvia all’accesso";
-"settings.launch.description" = "Avvia Dropshit automaticamente all’accesso. Installiamo un LaunchAgent in ~/Library/LaunchAgents — funziona sia con build pacchettizzate sia con build di sviluppo non firmate.";
+"settings.launch.description" = "Avvia AmorDrop automaticamente all’accesso. Installiamo un LaunchAgent in ~/Library/LaunchAgents — funziona sia con build pacchettizzate sia con build di sviluppo non firmate.";
 "Couldn't Update Login Items" = "Impossibile aggiornare gli elementi all’avvio";
 
 "Language" = "Lingua";
@@ -42,11 +42,6 @@
 "Settings…" = "Impostazioni…";
 "Quit" = "Esci";
 
-/* Auto-update */
-"Check for Updates…" = "Cerca aggiornamenti…";
-"Updates" = "Aggiornamenti";
-"Automatically check for updates" = "Cerca automaticamente aggiornamenti";
-"settings.updates.description" = "Dropshit controlla la presenza di nuove versioni in background una volta al giorno. Le nuove versioni vengono scaricate, verificate e installate quando fai clic su «Installa e riavvia».";
 
 "Open With" = "Apri con";
 "Show in Finder" = "Mostra nel Finder";

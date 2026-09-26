@@ -1,4 +1,6 @@
 .build/
+build/
+work/
 dist/
 .DS_Store
 xcuserdata/

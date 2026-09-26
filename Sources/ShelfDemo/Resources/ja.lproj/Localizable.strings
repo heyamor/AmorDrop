@@ -1,20 +1,20 @@
 /* Japanese (ja) translations */
 
 "Settings" = "設定";
-"Shelf Settings" = "Dropshit の設定";
+"Shelf Settings" = "AmorDrop の設定";
 "Auto-delete shelves" = "シェルフを自動削除";
 "Never" = "しない";
 "After 1 day" = "1日後";
 "After 7 days" = "7日後";
 "After 10 days" = "10日後";
 "After 30 days" = "30日後";
-"settings.expiry.description" = "シェルフは、最後の操作から選択した期間が経過すると削除されます。Finder からドラッグしたファイルはディスクに残ります。シェルフ内に取り込んだファイル(クリップボードの画像など)のみが削除されます。ピン留めしたシェルフは、この設定に関わらず自動削除されません。";
+"settings.expiry.description" = "有効期限が切れてもシェルフの項目だけが削除され、すべてのファイルはディスクに残ります。ピン留めしたシェルフには有効期限がありません。";
 "Park new shelves at the top-right corner" = "新しいシェルフを右上に格納する";
 "settings.park.description" = "新規シェルフに最初の項目が落ちると、シェルフは右上にスライドして退避します。新しいシェルフはその下に縦に積まれます。";
 "Collapse expanded shelf when clicking outside" = "外側をクリックしたら展開シェルフを折りたたむ";
 "settings.collapse.description" = "シェルフが展開表示中に別の場所をクリックすると、小さなピル状に折りたたまれます。ピルはその場に残ります — 折りたたみ済みのシェルフは影響を受けません。";
 "Launch at login" = "ログイン時に起動";
-"settings.launch.description" = "ログイン時に Dropshit を自動起動します。~/Library/LaunchAgents に LaunchAgent をインストールします — パッケージ版でも未署名の開発ビルドでも動作します。";
+"settings.launch.description" = "ログイン時に AmorDrop を自動起動します。~/Library/LaunchAgents に LaunchAgent をインストールします — パッケージ版でも未署名の開発ビルドでも動作します。";
 "Couldn't Update Login Items" = "ログイン項目を更新できませんでした";
 
 "Language" = "言語";
@@ -42,11 +42,6 @@
 "Settings…" = "設定…";
 "Quit" = "終了";
 
-/* Auto-update */
-"Check for Updates…" = "アップデートを確認…";
-"Updates" = "アップデート";
-"Automatically check for updates" = "アップデートを自動的に確認";
-"settings.updates.description" = "Dropshit は1日1回、バックグラウンドで新しいリリースを確認します。「インストールして再起動」をクリックすると、新バージョンがダウンロード、検証、インストールされます。";
 
 "Open With" = "このアプリケーションで開く";
 "Show in Finder" = "Finder で表示";

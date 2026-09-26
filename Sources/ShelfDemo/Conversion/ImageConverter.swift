@@ -9,7 +9,7 @@ enum ImageConverter {
     private static let jpegQuality: CGFloat = 0.9
 
     /// Convert `source` to `target`. Writes next to the source; falls back
-    /// to `~/Library/Caches/Dropshit/Converted` if the source dir refuses
+    /// to `~/Library/Caches/AmorDrop/Converted` if the source dir refuses
     /// writes. Atomic: writes to a sibling `<name>.partXXXX.<ext>` and
     /// renames into place on success.
     @discardableResult
@@ -124,7 +124,7 @@ enum ImageConverter {
             in: .userDomainMask,
             appropriateFor: nil,
             create: true
-        ).appendingPathComponent("Dropshit/Converted", isDirectory: true)
+        ).appendingPathComponent("AmorDrop/Converted", isDirectory: true)
 
         try fileManager.createDirectory(
             at: cache, withIntermediateDirectories: true

@@ -31,7 +31,13 @@ struct ShelfStoreContents {
 }
 
 final class ShelfStore {
-    private let storeURL: URL = {
+    private let storeURL: URL
+
+    init(storeURL: URL? = nil) {
+        if let storeURL {
+            self.storeURL = storeURL
+            return
+        }
         let fm = FileManager.default
         let base = (try? fm.url(
             for: .applicationSupportDirectory,
@@ -39,10 +45,10 @@ final class ShelfStore {
             appropriateFor: nil,
             create: true
         )) ?? fm.temporaryDirectory
-        let dir = base.appendingPathComponent("ShelfDemo", isDirectory: true)
+        let dir = base.appendingPathComponent("AmorDrop", isDirectory: true)
         try? fm.createDirectory(at: dir, withIntermediateDirectories: true)
-        return dir.appendingPathComponent("shelf.json")
-    }()
+        self.storeURL = dir.appendingPathComponent("shelf.json")
+    }
 
     // MARK: - Save
 

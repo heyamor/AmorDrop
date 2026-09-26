@@ -57,10 +57,11 @@ final class ShelfManager: ObservableObject {
         return cache
     }()
 
-    private let store = ShelfStore()
+    private let store: ShelfStore
     private var cancellables = Set<AnyCancellable>()
 
-    init() {
+    init(store: ShelfStore = ShelfStore()) {
+        self.store = store
         let loaded = store.load()
         self.shelves = loaded.shelves.isEmpty ? [Shelf()] : loaded.shelves
 
@@ -152,19 +153,15 @@ final class ShelfManager: ObservableObject {
     }
 
     /// Removes shelves whose last activity (most recent item add, falling back
-    /// to shelf createdAt) is older than `days`. For each removed shelf, files
-    /// that the shelf owns (i.e. live under our temporary directory) are also
-    /// deleted from disk; files originally from Finder or anywhere else are
-    /// left untouched.
+    /// to shelf createdAt) is older than `days`. Expiry removes shelf entries
+    /// only. A temporary-directory URL does not prove that we own a file, so
+    /// expiry must never delete backing files.
     /// Returns the IDs of the shelves that were pruned so callers can close
     /// any associated UI.
     @discardableResult
     func pruneShelves(olderThanDays days: Int) -> [UUID] {
         guard days > 0 else { return [] }
         let cutoff = Date().addingTimeInterval(-Double(days) * 86_400)
-        let tempPath = FileManager.default.temporaryDirectory
-            .standardizedFileURL.path
-
         let expired = shelves.filter { shelf in
             // Pinned shelves are exempt from auto-expiry regardless of age.
             guard !shelf.pinned else { return false }
@@ -173,14 +170,6 @@ final class ShelfManager: ObservableObject {
         }
         guard !expired.isEmpty else { return [] }
 
-        for shelf in expired {
-            for item in shelf.items {
-                guard let url = item.fileURL else { continue }
-                let path = url.standardizedFileURL.path
-                guard path.hasPrefix(tempPath) else { continue }
-                try? FileManager.default.removeItem(at: url)
-            }
-        }
         let ids = expired.map(\.id)
         shelves.removeAll { ids.contains($0.id) }
         return ids
@@ -566,12 +555,13 @@ final class ShelfManager: ObservableObject {
             scale: scale,
             representationTypes: reprTypes
         )
+        let cacheKeyString = key as String
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { [weak self] rep, _ in
             guard let rep else { return }
             let image = rep.nsImage
             let isIcon = (rep.type == .icon)
-            Self.thumbnailCache.setObject(CachedThumbnail(image: image, isIcon: isIcon), forKey: key)
             Task { @MainActor [weak self] in
+                Self.thumbnailCache.setObject(CachedThumbnail(image: image, isIcon: isIcon), forKey: cacheKeyString as NSString)
                 self?.updateThumbnail(id: id, image: image, isIcon: isIcon)
             }
         }
