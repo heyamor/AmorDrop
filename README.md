@@ -26,7 +26,7 @@ This builds `build/AmorDrop.app`, with bundle identifier `com.amor.personal.amor
 
 The Release build and 44 XCTest tests passed on Xcode 27. The installed app launched successfully. Live checks verified shelf creation, file names and thumbnails for seven fixture types, Quick Look, clearing, undo, closing/reopening, and the Finder-copy → Shelf-paste → Shelf-copy → Finder-paste workflow, including file-content hashes. Automated tests cover multiple shelves, file-promise safety, ZIP archives, PNG/JPEG conversion, and the shake recognition algorithm.
 
-Physical Control-Option-Space, the visible menu bar icon, cross-app drag-and-drop, edge docking, and shake-to-summon still require manual verification. Global shortcut registration succeeded, but the desktop automation's simulated keys did not establish a working global shortcut. Gesture unit tests do not establish that Finder's real drag events reach the app.
+On 2026-09-26, the owner confirmed that the menu bar icon, physical Control-Option-Space, shake-to-summon during a Finder file drag, real Finder → Shelf → Finder drag-and-drop, and edge docking all work normally. Release was rebuilt and all 44 XCTest tests passed again without application-source changes. This version is frozen as the personal AmorDrop V1 baseline under the annotated tag `amordrop-v1.0.0`. See [the baseline record](docs/V1-BASELINE.md) for verification scope and artifact identity. Browser upload drag-and-drop and long-duration sleep/wake behavior remain outside this acceptance round.
 
 ## Privacy and file handling
 
