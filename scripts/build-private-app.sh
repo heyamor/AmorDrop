@@ -24,11 +24,14 @@ BUILD_ARGS=(-c release --arch arm64
   --scratch-path .build
   --manifest-cache local
   -Xswiftc -module-cache-path -Xswiftc "$PWD/.build/module-cache")
-xcrun swift build "${BUILD_ARGS[@]}"
+xcrun swift build "${BUILD_ARGS[@]}" --product ShelfDemo
+xcrun swift build "${BUILD_ARGS[@]}" --product AmorDropClosedLidHelper
 BIN_DIR="$(xcrun swift build "${BUILD_ARGS[@]}" --show-bin-path)"
 
-mkdir -p "${APP_DIR}/Contents/MacOS" "${APP_DIR}/Contents/Resources"
+mkdir -p "${APP_DIR}/Contents/MacOS" "${APP_DIR}/Contents/Resources" "${APP_DIR}/Contents/Library/LaunchDaemons"
 cp "${BIN_DIR}/ShelfDemo" "${APP_DIR}/Contents/MacOS/${APP_NAME}"
+cp "${BIN_DIR}/AmorDropClosedLidHelper" "${APP_DIR}/Contents/MacOS/AmorDropClosedLidHelper"
+cp Packaging/com.amor.personal.amordrop.closed-lid.plist "${APP_DIR}/Contents/Library/LaunchDaemons/"
 
 RESOURCE_BUNDLE="${BIN_DIR}/ShelfDemo_ShelfDemo.bundle"
 test -d "${RESOURCE_BUNDLE}"
@@ -49,6 +52,7 @@ cp LICENSE "${APP_DIR}/Contents/Resources/LICENSE"
 /usr/libexec/PlistBuddy -c "Add :LSMinimumSystemVersion string 27.0" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :LSUIElement bool true" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :NSPrincipalClass string NSApplication" "${APP_DIR}/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :NSInputMonitoringUsageDescription string AmorDrop temporarily monitors keyboard events only while Keyboard Cleaning Lock is active, so it can suppress typing and recognize the unlock shortcut." "${APP_DIR}/Contents/Info.plist"
 
 # These are freshly built local artifacts. File-provider/Finder metadata
 # copied from the source tree must not become part of the signed bundle.

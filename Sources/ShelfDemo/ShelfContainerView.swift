@@ -159,13 +159,11 @@ struct ShelfContainerView: View {
         if manager.isDragging { return false }
         let target = shelfID
 
-        // 1. File URLs — covers both files and folders. Finder always vends
-        // `.fileURL` for folders to AppKit destinations, so we don't need the
-        // separate `public.folder` branch the SwiftUI version had to carry.
-        if let urls = pasteboard.readObjects(
-            forClasses: [NSURL.self],
-            options: [.urlReadingFileURLsOnly: true]
-        ) as? [URL], !urls.isEmpty {
+        // 1. File URLs and legacy filename lists. Finder publishes file URLs,
+        // while some app-originated drags still use NSFilenamesPboardType or
+        // encode a file URL as a string. Only existing local files are accepted.
+        let urls = fileURLs(in: pasteboard)
+        if !urls.isEmpty {
             for url in urls {
                 manager.addFile(url: url, to: target)
             }
@@ -237,6 +235,58 @@ struct ShelfContainerView: View {
         }
 
         return false
+    }
+
+    private func fileURLs(in pasteboard: NSPasteboard) -> [URL] {
+        let fileManager = FileManager.default
+        var candidates = (pasteboard.readObjects(
+            forClasses: [NSURL.self],
+            options: [.urlReadingFileURLsOnly: true]
+        ) as? [URL]) ?? []
+
+        let legacyFileNames = NSPasteboard.PasteboardType("NSFilenamesPboardType")
+        for item in pasteboard.pasteboardItems ?? [] {
+            for type in [NSPasteboard.PasteboardType.fileURL, .URL] {
+                if let representation = item.string(forType: type),
+                   let url = localFileURL(from: representation) {
+                    candidates.append(url)
+                }
+            }
+
+            if let paths = item.propertyList(forType: legacyFileNames) as? [String] {
+                candidates.append(contentsOf: paths.compactMap(localFileURL(from:)))
+            } else if let path = item.propertyList(forType: legacyFileNames) as? String,
+                      let url = localFileURL(from: path) {
+                candidates.append(url)
+            }
+        }
+
+        if let paths = pasteboard.propertyList(forType: legacyFileNames) as? [String] {
+            candidates.append(contentsOf: paths.compactMap(localFileURL(from:)))
+        }
+
+        var seen = Set<String>()
+        return candidates.compactMap { candidate in
+            guard candidate.isFileURL else { return nil }
+            let url = candidate.standardizedFileURL
+            guard fileManager.fileExists(atPath: url.path), seen.insert(url.path).inserted else {
+                return nil
+            }
+            return url
+        }
+    }
+
+    private func localFileURL(from representation: String) -> URL? {
+        let value = representation.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !value.isEmpty else { return nil }
+
+        if let url = URL(string: value), url.isFileURL {
+            return url
+        }
+
+        let expandedPath = (value as NSString).expandingTildeInPath
+        guard expandedPath.hasPrefix("/") else { return nil }
+        return URL(fileURLWithPath: expandedPath)
     }
 
     private func toggle(to expanded: Bool) {

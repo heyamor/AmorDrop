@@ -2,13 +2,10 @@ import AppKit
 import SwiftUI
 import UniformTypeIdentifiers
 
-/// A transparent drop destination that returns `.generic` from the dragging
-/// destination protocol so the system never paints the green "+" copy badge
-/// on the cursor. SwiftUI's `.onDrop(...)` paints the badge unconditionally
-/// (it routes drops as `.copy`), and `DropDelegate` only exposes
-/// `.copy / .move / .cancel / .forbidden` — none of which suppress the
-/// indicator while still accepting the drop. Going through AppKit directly
-/// is the only path that keeps the cursor clean.
+/// A transparent AppKit drop destination that prefers `.generic` to avoid
+/// the green "+" copy badge, and falls back to `.copy` when the drag source
+/// doesn't offer `.generic`. It never accepts move-only drags because the
+/// Shelf references source files instead of taking ownership of them.
 ///
 /// `hitTest:` returns nil so this overlay never claims mouse clicks: drag
 /// destination dispatch in AppKit is driven by `registerForDraggedTypes` plus
@@ -72,6 +69,9 @@ final class ShelfDropView: NSView {
             .tiff,
             .png,
             .string,
+            // Some app-originated file drags still use AppKit's legacy
+            // filename-list representation.
+            NSPasteboard.PasteboardType("NSFilenamesPboardType"),
         ]
         types.append(contentsOf:
             NSFilePromiseReceiver.readableDraggedTypes
@@ -92,13 +92,25 @@ final class ShelfDropView: NSView {
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard allowDrop() else { return [] }
+        let operation = supportedOperation(for: sender.draggingSourceOperationMask)
+        guard !operation.isEmpty else { return [] }
         onTargetedChange?(true)
-        return .generic
+        return operation
     }
 
     override func draggingUpdated(_ sender: NSDraggingInfo) -> NSDragOperation {
         guard allowDrop() else { return [] }
-        return .generic
+        let operation = supportedOperation(for: sender.draggingSourceOperationMask)
+        if operation.isEmpty { onTargetedChange?(false) }
+        return operation
+    }
+
+    private func supportedOperation(for sourceMask: NSDragOperation) -> NSDragOperation {
+        // The Shelf references source files and must never negotiate a move,
+        // which could remove a chat attachment from its original location.
+        if sourceMask.contains(.generic) { return .generic }
+        if sourceMask.contains(.copy) { return .copy }
+        return []
     }
 
     override func draggingExited(_ sender: NSDraggingInfo?) {

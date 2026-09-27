@@ -1,6 +1,6 @@
 # AmorDrop
 
-AmorDrop is a private, native macOS file shelf based on [Dropshit](https://github.com/iamsumanp/Dropshit) by Suman Pokharel. It keeps the original SwiftUI/AppKit shelf and drag implementation, with the automatic updater removed and a local app bundle for this Mac.
+AmorDrop is a personal, native macOS file shelf based on [Dropshit](https://github.com/iamsumanp/Dropshit) by Suman Pokharel. It keeps the original SwiftUI/AppKit shelf and drag implementation, with the automatic updater removed and a local app bundle for this Mac.
 
 ## Use
 
@@ -27,6 +27,10 @@ This builds `build/AmorDrop.app`, with bundle identifier `com.amor.personal.amor
 The Release build and 44 XCTest tests passed on Xcode 27. The installed app launched successfully. Live checks verified shelf creation, file names and thumbnails for seven fixture types, Quick Look, clearing, undo, closing/reopening, and the Finder-copy → Shelf-paste → Shelf-copy → Finder-paste workflow, including file-content hashes. Automated tests cover multiple shelves, file-promise safety, ZIP archives, PNG/JPEG conversion, and the shake recognition algorithm.
 
 On 2026-09-26, the owner confirmed that the menu bar icon, physical Control-Option-Space, shake-to-summon during a Finder file drag, real Finder → Shelf → Finder drag-and-drop, and edge docking all work normally. Release was rebuilt and all 44 XCTest tests passed again without application-source changes. This version is frozen as the personal AmorDrop V1 baseline under the annotated tag `amordrop-v1.0.0`. See [the baseline record](docs/V1-BASELINE.md) for verification scope and artifact identity. Browser upload drag-and-drop and long-duration sleep/wake behavior remain outside this acceptance round.
+
+## Repository status
+
+The `amordrop-v1.0.0` tag marks the last manually accepted Shelf baseline. The current source snapshot also includes in-progress Mac Control and external-app drop compatibility changes. Those latest changes have not yet completed a Release build, the full test suite, or physical-device acceptance; the 44-test result above applies to the V1 baseline. Closed-Lid support is a separate privileged feature and requires explicit administrator approval before activation.
 
 ## Privacy and file handling
 

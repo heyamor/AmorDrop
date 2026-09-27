@@ -1,6 +1,5 @@
 import AppKit
 import Combine
-import IOKit.pwr_mgt
 import SwiftUI
 
 @main
@@ -31,6 +30,7 @@ struct ShelfDemoApp {
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var statusItem: NSStatusItem!
     private let manager = ShelfManager()
+    private let macControl = MacControlCoordinator()
     private let shakeDetector = ShakeDetector()
     private let summonHotKey = GlobalHotKey()
 
@@ -78,18 +78,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var missingFileSweepTimer: Timer?
 
     private var statusItemIconCancellable: AnyCancellable?
-
-    // Caffeine-style "Keep Mac Awake" — holds an IOKit power assertion that
-    // blocks user-idle display sleep (which also blocks idle system sleep
-    // and screen-saver activation as a side effect).
-    private var keepAwakeAssertion: IOPMAssertionID = 0
-    private var isKeepAwake: Bool = false
-    // nil while indefinite or off; the original duration (in seconds) when
-    // a timed activation is in flight, used both for the auto-off timer and
-    // to checkmark the right item under "Activate for".
-    private var keepAwakeDuration: TimeInterval?
-    private var keepAwakeTimer: Timer?
+    private var macControlCancellable: AnyCancellable?
+    private var keyboardLockOverlay: NSPanel?
     private var dropTargetActive: Bool = false
+    private var isKeepAwake: Bool = false
 
     // Auto-park (top-right stack) state — populated only when the
     // "shelf.autoParkTopRight" preference is on. We track per-shelf item
@@ -203,6 +195,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         statusItem.button?.setAccessibilityLabel("AmorDrop")
         statusItem.button?.toolTip = "AmorDrop"
         applyStatusIcon(dropping: false)
+        macControl.start()
         // Flip the glyph while any panel is being targeted by a drop so the
         // menubar mirrors the "ready to receive" state visually.
         statusItemIconCancellable = manager.$isAnyShelfDropTarget
@@ -213,6 +206,28 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         let menu = NSMenu()
         menu.delegate = self
         statusItem.menu = menu
+        // Populate synchronously so the first click on the status item is
+        // useful. menuNeedsUpdate is nonisolated and refreshes asynchronously.
+        rebuildStatusMenu(menu)
+        macControlCancellable = Publishers.CombineLatest(
+            macControl.keepAwake.$sessions,
+            macControl.keyboardLock.$state
+        ).sink { [weak self] sessions, state in
+            Task { @MainActor [weak self] in
+                self?.applyStatusIcon(awake: !sessions.isEmpty)
+                let lockOverlayShouldShow: Bool
+                if case .countingDown = state {
+                    lockOverlayShouldShow = true
+                } else {
+                    lockOverlayShouldShow = state == .locked
+                }
+                if lockOverlayShouldShow {
+                    self?.showKeyboardLockOverlay()
+                } else {
+                    self?.keyboardLockOverlay?.orderOut(nil)
+                }
+            }
+        }
 
         shakeDetector.onShake = { [weak self] in self?.handleShake() }
         shakeDetector.start()
@@ -332,42 +347,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private func rebuildStatusMenu(_ menu: NSMenu) {
         menu.removeAllItems()
 
-        let keepAwake = NSMenuItem(
-            title: L("Keep Mac Awake"),
-            action: #selector(toggleKeepAwakeAction),
-            keyEquivalent: ""
-        )
-        keepAwake.target = self
-        keepAwake.state = isKeepAwake ? .on : .off
+        let keepAwake = NSMenuItem(title: keepAwakeStatusTitle, action: nil, keyEquivalent: "")
+        keepAwake.submenu = buildKeepAwakeMenu()
         menu.addItem(keepAwake)
 
-        let activateFor = NSMenuItem(title: L("Activate for"), action: nil, keyEquivalent: "")
-        activateFor.submenu = buildKeepAwakeDurationsMenu()
-        menu.addItem(activateFor)
+        let controls = NSMenuItem(title: L("Mac Controls"), action: nil, keyEquivalent: "")
+        controls.submenu = buildMacControlsMenu()
+        menu.addItem(controls)
 
-        menu.addItem(.separator())
-
-        let newShelf = NSMenuItem(
-            title: L("New Shelf"),
-            action: #selector(newShelfAction),
-            keyEquivalent: "n"
-        )
-        newShelf.target = self
-        newShelf.keyEquivalentModifierMask = [.option, .shift]
-        menu.addItem(newShelf)
-
-        let newFromClip = NSMenuItem(
-            title: L("New Shelf From Clipboard"),
-            action: #selector(newShelfFromClipboardAction),
-            keyEquivalent: "a"
-        )
-        newFromClip.target = self
-        newFromClip.keyEquivalentModifierMask = [.option, .shift]
-        menu.addItem(newFromClip)
-
-        let recent = NSMenuItem(title: L("Recent Shelves"), action: nil, keyEquivalent: "")
-        recent.submenu = buildRecentShelvesMenu()
-        menu.addItem(recent)
+        let shelf = NSMenuItem(title: L("Shelf"), action: nil, keyEquivalent: "")
+        shelf.submenu = buildShelfMenu()
+        menu.addItem(shelf)
 
         menu.addItem(.separator())
 
@@ -387,66 +377,69 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.addItem(quit)
     }
 
-    @objc private func toggleKeepAwakeAction() {
-        setKeepAwake(!isKeepAwake)
+    private var keepAwakeStatusTitle: String {
+        guard let session = macControl.keepAwake.session(for: .manual) else {
+            return macControl.keepAwake.isActive
+                ? "\(L("Keep Mac Awake")) · \(L("On"))"
+                : L("Keep Mac Awake")
+        }
+        guard let deadline = session.deadline else {
+            return "\(L("Keep Mac Awake")) · \(L("Indefinitely"))"
+        }
+        let remaining = max(0, Int(deadline.timeIntervalSince(macControl.keepAwake.currentTime)))
+        let minutes = remaining / 60
+        let hours = minutes / 60
+        let label = hours > 0 ? "\(hours)h \(minutes % 60)m" : "\(max(1, minutes))m"
+        return "\(L("Keep Mac Awake")) · \(label)"
     }
 
     @objc private func keepAwakeForAction(_ sender: NSMenuItem) {
-        // representedObject carries the duration in seconds; nil = indefinite.
-        let duration = sender.representedObject as? TimeInterval
-        setKeepAwake(true, duration: duration)
-    }
-
-    /// Holds (or releases) an IOKit power-management assertion that prevents
-    /// idle display sleep — which transitively blocks idle system sleep and
-    /// the screen saver, matching Caffeine's behavior. When `duration` is
-    /// non-nil, schedules an auto-off timer for that many seconds.
-    private func setKeepAwake(_ enabled: Bool, duration: TimeInterval? = nil) {
-        keepAwakeTimer?.invalidate()
-        keepAwakeTimer = nil
-
-        if enabled {
-            if !isKeepAwake {
-                var assertion: IOPMAssertionID = 0
-                let result = IOPMAssertionCreateWithName(
-                    kIOPMAssertionTypePreventUserIdleDisplaySleep as CFString,
-                    IOPMAssertionLevel(kIOPMAssertionLevelOn),
-                    "AmorDrop keep-awake" as CFString,
-                    &assertion
-                )
-                guard result == kIOReturnSuccess else { return }
-                keepAwakeAssertion = assertion
-                applyStatusIcon(awake: true)
-            }
-            keepAwakeDuration = duration
-            if let duration {
-                keepAwakeTimer = Timer.scheduledTimer(
-                    withTimeInterval: duration, repeats: false
-                ) { [weak self] _ in
-                    Task { @MainActor in self?.setKeepAwake(false) }
-                }
-            }
-        } else if isKeepAwake {
-            IOPMAssertionRelease(keepAwakeAssertion)
-            keepAwakeAssertion = 0
-            keepAwakeDuration = nil
-            applyStatusIcon(awake: false)
+        if sender.title == L("End Session") {
+            endManualKeepAwake()
+            return
         }
+        if sender.title == L("Until…") {
+            let picker = NSDatePicker(frame: NSRect(x: 0, y: 0, width: 250, height: 28))
+            picker.datePickerStyle = .textFieldAndStepper
+            picker.datePickerElements = [.yearMonthDay, .hourMinute]
+            picker.dateValue = Date().addingTimeInterval(60 * 60)
+            let alert = NSAlert()
+            alert.messageText = L("Keep Awake Until")
+            alert.accessoryView = picker
+            alert.addButton(withTitle: L("Start"))
+            alert.addButton(withTitle: L("Cancel"))
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            guard macControl.startManualKeepAwake(duration: .until(picker.dateValue)) else {
+                showKeepAwakeStartFailure()
+                return
+            }
+        } else if let duration = sender.representedObject as? KeepAwakeDuration {
+            guard macControl.startManualKeepAwake(duration: duration) else {
+                showKeepAwakeStartFailure()
+                return
+            }
+        }
+        applyStatusIcon(awake: macControl.keepAwake.isActive)
     }
 
-    private func buildKeepAwakeDurationsMenu() -> NSMenu {
+    private func buildKeepAwakeMenu() -> NSMenu {
         let submenu = NSMenu()
-        // (title, duration in seconds; nil = indefinite)
-        let options: [(String, TimeInterval?)] = [
-            (L("Indefinitely"), nil),
-            (L("5 minutes"),  5 * 60),
-            (L("10 minutes"), 10 * 60),
-            (L("15 minutes"), 15 * 60),
-            (L("20 minutes"), 20 * 60),
-            (L("1 hour"),     60 * 60),
-            (L("2 hours"),    2 * 60 * 60),
-            (L("3 hours"),    3 * 60 * 60),
-            (L("5 hours"),    5 * 60 * 60),
+        let quickStart = NSMenuItem(
+            title: L("Start Keep Awake for 1 Hour"),
+            action: #selector(keepAwakeForAction(_:)),
+            keyEquivalent: ""
+        )
+        quickStart.target = self
+        quickStart.representedObject = KeepAwakeDuration.minutes(60)
+        submenu.addItem(quickStart)
+        submenu.addItem(.separator())
+
+        let options: [(String, KeepAwakeDuration)] = [
+            (L("30 minutes"), .minutes(30)),
+            (L("1 hour"), .minutes(60)),
+            (L("2 hours"), .minutes(120)),
+            (L("Until…"), .indefinite),
+            (L("Indefinitely"), .indefinite),
         ]
         for (title, duration) in options {
             let item = NSMenuItem(
@@ -456,19 +449,194 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             )
             item.target = self
             item.representedObject = duration
-            // Tick the row that matches the current state. "Indefinitely"
-            // matches when keep-awake is on with no auto-off timer.
-            if isKeepAwake, duration == keepAwakeDuration {
-                item.state = .on
-            }
             submenu.addItem(item)
         }
+
+        submenu.addItem(.separator())
+        let end = NSMenuItem(title: L("End Session"), action: #selector(endManualKeepAwake), keyEquivalent: "")
+        end.target = self
+        end.isEnabled = macControl.keepAwake.session(for: .manual) != nil
+        submenu.addItem(end)
         return submenu
+    }
+
+    private func buildShelfMenu() -> NSMenu {
+        let submenu = NSMenu()
+        let newShelf = NSMenuItem(title: L("New Shelf"), action: #selector(newShelfAction), keyEquivalent: "n")
+        newShelf.target = self
+        newShelf.keyEquivalentModifierMask = [.option, .shift]
+        submenu.addItem(newShelf)
+        let newFromClip = NSMenuItem(
+            title: L("New Shelf From Clipboard"),
+            action: #selector(newShelfFromClipboardAction),
+            keyEquivalent: "a"
+        )
+        newFromClip.target = self
+        newFromClip.keyEquivalentModifierMask = [.option, .shift]
+        submenu.addItem(newFromClip)
+        submenu.addItem(.separator())
+        let recent = NSMenuItem(title: L("Recent Shelves"), action: nil, keyEquivalent: "")
+        recent.submenu = buildRecentShelvesMenu()
+        submenu.addItem(recent)
+        return submenu
+    }
+
+    private func buildMacControlsMenu() -> NSMenu {
+        let submenu = NSMenu()
+        let closedLid = NSMenuItem(
+            title: closedLidMenuTitle,
+            action: #selector(showClosedLidSetup),
+            keyEquivalent: ""
+        )
+        closedLid.target = self
+        submenu.addItem(closedLid)
+        let keyboard = NSMenuItem(title: keyboardLockMenuTitle, action: #selector(requestKeyboardLock), keyEquivalent: "")
+        keyboard.target = self
+        submenu.addItem(keyboard)
+        return submenu
+    }
+
+    private var keyboardLockMenuTitle: String {
+        switch macControl.keyboardLock.state {
+        case .countingDown(let seconds): return "\(L("Lock Keyboard")) · \(seconds)"
+        case .locked: return L("Unlock Keyboard")
+        case .permissionRequired: return L("Keyboard Lock Permission Required")
+        case .unavailable: return L("Keyboard Lock Unavailable")
+        case .idle: return L("Lock Keyboard")
+        }
+    }
+
+    @objc private func endManualKeepAwake() {
+        macControl.endManualKeepAwake()
+        applyStatusIcon(awake: macControl.keepAwake.isActive)
+    }
+
+    private func showKeepAwakeStartFailure() {
+        let alert = NSAlert()
+        alert.messageText = L("Couldn't Start Keep Awake")
+        alert.informativeText = macControl.keepAwakeBlockedByLowBattery
+            ? L("macControl.keepAwake.lowBatteryBlocked")
+            : L("macControl.keepAwake.assertionFailed")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L("OK"))
+        alert.runModal()
+    }
+
+    private var closedLidMenuTitle: String {
+        if macControl.closedLid.sessionActive { return L("End Closed-Lid Mode") }
+        if macControl.closedLid.isAuthorized { return L("Start Closed-Lid Mode…") }
+        return L("Set up Closed-Lid Mode…")
+    }
+
+    @objc private func showClosedLidSetup() {
+        let closedLid = macControl.closedLid
+        guard closedLid.isAuthorized else {
+            let alert = NSAlert()
+            alert.messageText = L("Closed-Lid Mode Needs Setup")
+            alert.informativeText = L("macControl.closedLid.setupRequired")
+            alert.alertStyle = .informational
+            alert.addButton(withTitle: L("Request Helper Approval"))
+            alert.addButton(withTitle: L("Cancel"))
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            do {
+                try closedLid.requestHelperAuthorization()
+            } catch {
+                showClosedLidError(error.localizedDescription)
+            }
+            return
+        }
+
+        if closedLid.sessionActive {
+            Task { @MainActor in
+                do { try await closedLid.stopSession() }
+                catch { showClosedLidError(error.localizedDescription) }
+            }
+            return
+        }
+
+        let alert = NSAlert()
+        alert.messageText = L("Start Closed-Lid Mode?")
+        alert.informativeText = L("macControl.closedLid.sessionWarning")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L("Start Closed-Lid Mode"))
+        alert.addButton(withTitle: L("Cancel"))
+        guard alert.runModal() == .alertFirstButtonReturn else { return }
+        let defaults = UserDefaults.standard
+        let batteryProtection = defaults.object(forKey: MacControlPreference.lowBatteryProtection) as? Bool ?? true
+        let threshold = defaults.object(forKey: MacControlPreference.lowBatteryThreshold) as? Int ?? 20
+        Task { @MainActor in
+            do {
+                try await closedLid.startSession(
+                    lowBatteryProtectionEnabled: batteryProtection,
+                    threshold: threshold
+                )
+            } catch {
+                showClosedLidError(error.localizedDescription)
+            }
+        }
+    }
+
+    private func showClosedLidError(_ message: String) {
+        let alert = NSAlert()
+        alert.messageText = L("Closed-Lid Mode Error")
+        alert.informativeText = message
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L("OK"))
+        alert.runModal()
+    }
+
+    @objc private func requestKeyboardLock() {
+        if macControl.keyboardLock.state == .locked {
+            macControl.keyboardLock.unlock()
+        } else {
+            macControl.requestKeyboardLock()
+            if macControl.keyboardLock.state == .permissionRequired {
+                showKeyboardPermissionGuide()
+            }
+        }
+    }
+
+    private func showKeyboardPermissionGuide() {
+        let alert = NSAlert()
+        alert.messageText = L("Keyboard Lock Permission Required")
+        alert.informativeText = L("macControl.keyboard.permissionGuide")
+        alert.alertStyle = .informational
+        alert.addButton(withTitle: L("Open Input Monitoring Settings"))
+        alert.addButton(withTitle: L("Cancel"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            macControl.keyboardLock.openInputMonitoringSettings()
+        }
+        macControl.keyboardLock.returnToIdle()
+    }
+
+    private func showKeyboardLockOverlay() {
+        if let keyboardLockOverlay {
+            keyboardLockOverlay.orderFrontRegardless()
+            return
+        }
+        let panel = NSPanel(
+            contentRect: NSRect(x: 0, y: 0, width: 360, height: 176),
+            styleMask: [.borderless, .nonactivatingPanel],
+            backing: .buffered,
+            defer: false
+        )
+        panel.isFloatingPanel = true
+        panel.level = .floating
+        panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary]
+        panel.backgroundColor = .clear
+        panel.isOpaque = false
+        panel.hasShadow = true
+        panel.isMovableByWindowBackground = true
+        panel.becomesKeyOnlyIfNeeded = true
+        panel.contentView = NSHostingView(rootView: KeyboardLockOverlay(manager: macControl.keyboardLock))
+        panel.center()
+        keyboardLockOverlay = panel
+        panel.orderFrontRegardless()
     }
 
     @objc private func openSettingsAction() {
         if settingsWindow == nil {
-            let hosting = NSHostingController(rootView: SettingsView())
+            let hosting = NSHostingController(rootView: SettingsView(macControl: macControl))
             let window = NSWindow(contentViewController: hosting)
             // Set once at creation; the title doesn't refresh on language
             // change. Pre-existing accepted limitation from v1.4.
@@ -1222,6 +1390,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // MARK: - Quit
 
     func applicationWillTerminate(_ notification: Notification) {
+        macControl.shutdown()
         conversionService.cancelAll()
         ocrService.cancelAll()
     }

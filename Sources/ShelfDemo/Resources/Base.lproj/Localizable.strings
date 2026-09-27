@@ -20,6 +20,54 @@
 "settings.launch.description" = "Starts Shelf automatically when you log in. We install a LaunchAgent in ~/Library/LaunchAgents — works for both packaged and unsigned dev builds.";
 "Couldn't Update Login Items" = "Couldn't Update Login Items";
 
+/* Mac control */
+"Mac Control" = "Mac Control";
+"Allow display to sleep" = "Allow display to sleep";
+"macControl.awake.description" = "Prevents idle system sleep. The display may still turn off by default; turn this off to prevent display idle sleep too.";
+"Start Keep Awake for 1 Hour" = "Keep Awake for 1 Hour";
+"Couldn't Start Keep Awake" = "Couldn't Start Keep Awake";
+"macControl.keepAwake.lowBatteryBlocked" = "Keep Awake did not start because the battery is below the protection threshold.";
+"macControl.keepAwake.assertionFailed" = "macOS could not create the power assertion. Keep Awake did not start.";
+"Stop Keep Awake below" = "Stop Keep Awake below";
+"Battery threshold" = "Battery threshold";
+"Keep awake when connected to power" = "Keep awake when connected to power";
+"Keep awake while these apps run" = "Keep awake while these apps run";
+"Refresh" = "Refresh";
+"macControl.apps.none" = "No eligible apps are running.";
+" (not running)" = " (not running)";
+"macControl.apps.description" = "Selected apps create independent sessions while running. They do not end a manual session.";
+"Closed-Lid Mode" = "Closed-Lid Mode";
+"Allow Mac to keep running with lid closed" = "Allow Mac to keep running with lid closed";
+"macControl.closedLid.unavailable" = "Available after you approve AmorDrop’s privileged helper in System Settings.";
+"Lock the user session when the lid closes" = "Lock the user session when the lid closes";
+"macControl.closedLid.lockDefault" = "AmorDrop does not change macOS lock or authentication settings. Lock manually with Control-Command-Q before closing the lid; clamshell lock behavior still needs on-device verification.";
+"Set up Closed-Lid Mode…" = "Set Up Closed-Lid Mode…";
+"Closed-Lid Mode Needs Setup" = "Closed-Lid Mode Needs Setup";
+"macControl.closedLid.setupRequired" = "Closed-Lid Mode requires registering AmorDrop’s privileged LaunchDaemon with macOS, which requires administrator approval. It will set pmset disablesleep=1 only while you start a Closed-Lid session, after saving the current value, and will try to restore it on stop, app exit/disconnect, low battery, or helper restart. This request has not been made and no system settings have changed.";
+"Mac Controls" = "Mac Controls";
+"Keyboard Cleaning Lock" = "Keyboard Cleaning Lock";
+"macControl.keyboard.shortcut" = "Unlock: hold Control + Option + Command + L for 2 seconds.";
+"Keyboard lock starting" = "Keyboard lock starting";
+"Keyboard Locked" = "Keyboard Locked";
+"Lock Keyboard" = "Lock Keyboard";
+"Unlock Keyboard" = "Unlock Keyboard";
+"Permission Required" = "Permission Required";
+"Unavailable" = "Unavailable";
+"Keyboard Lock Permission Required" = "Keyboard Lock Permission Required";
+"macControl.keyboard.permissionGuide" = "Open System Settings → Privacy & Security → Input Monitoring and allow AmorDrop. Then quit and reopen AmorDrop before trying again.";
+"Open Input Monitoring Settings" = "Open Input Monitoring Settings";
+"Cancel" = "Cancel";
+"Keyboard Lock Unavailable" = "Keyboard Lock Unavailable";
+"macControl.keyboard.unavailable" = "macOS did not allow the keyboard event tap to start. Keyboard input has not been blocked.";
+"End Session" = "End Session";
+"Until…" = "Until…";
+"30 minutes" = "30 minutes";
+"Keep Awake Until" = "Keep Awake Until";
+"Start" = "Start";
+"Connected to power" = "Connected to power";
+"On battery" = "On battery";
+"Battery status unavailable" = "Battery status unavailable";
+
 "Language" = "Language";
 "language.system" = "System Default";
 "settings.language.description" = "Overrides the macOS system language for this app only.";
@@ -27,6 +75,7 @@
 "Quit & Reopen" = "Quit & Reopen";
 
 "Keep Mac Awake" = "Keep Mac Awake";
+"On" = "On";
 "Activate for" = "Activate for";
 "Indefinitely" = "Indefinitely";
 "5 minutes" = "5 minutes";
@@ -165,3 +214,23 @@
 "undo.clear-shelf" = "Undo Clear Shelf";
 "undo.move-to-trash" = "Undo Move to Trash";
 "undo.move-to-trash-count" = "Undo Move to Trash (%lld)";
+
+"Request Helper Approval" = "Request Helper Approval";
+"Open Login Items Settings" = "Open Login Items Settings";
+"Start Closed-Lid Mode…" = "Start Closed-Lid Mode…";
+"End Closed-Lid Mode" = "End Closed-Lid Mode";
+"Start Closed-Lid Mode" = "Start Closed-Lid Mode";
+"Start Closed-Lid Mode?" = "Start Closed-Lid Mode?";
+"Closed-Lid Mode Error" = "Closed-Lid Mode Error";
+"macControl.closedLid.helperFailure" = "The helper could not complete this operation. System sleep settings may need restoration.";
+"macControl.closedLid.active" = "Closed-Lid Mode is active. The helper is monitoring the battery.";
+"macControl.closedLid.ready" = "The helper is approved. System sleep settings change only during a session.";
+"macControl.closedLid.approvalRequired" = "Approve the AmorDrop helper in System Settings → General → Login Items.";
+"macControl.closedLid.helperMissing" = "This app bundle does not contain the Closed-Lid helper.";
+"macControl.closedLid.sessionWarning" = "During the session AmorDrop temporarily sets pmset disablesleep=1 after saving the original value, then tries to restore it on stop, app exit, disconnect, low battery, or helper restart. This can cause battery drain and heat. AmorDrop does not change lock/authentication settings and cannot guarantee the user session auto-locks when the lid closes. Manually lock with Control-Command-Q first, and continue only if you accept this risk.";
+
+"Remove Helper…" = "Remove Helper…";
+"Refresh Status" = "Refresh Status";
+"Remove Helper" = "Remove Helper";
+"Remove AmorDrop Helper?" = "Remove the AmorDrop Helper?";
+"macControl.closedLid.removeWarning" = "AmorDrop first ends any active session and restores the saved sleep setting, then unregisters its Login Item helper. macOS approval is required. If restoration cannot be verified, the helper refuses removal.";

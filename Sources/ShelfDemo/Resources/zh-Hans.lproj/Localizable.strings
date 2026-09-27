@@ -17,6 +17,67 @@
 "settings.launch.description" = "登录时自动启动 AmorDrop。我们会在 ~/Library/LaunchAgents 中安装一个 LaunchAgent — 对打包版本和未签名的开发版本都有效。";
 "Couldn't Update Login Items" = "无法更新登录项";
 
+/* Mac 控制 */
+"Mac Control" = "Mac 控制";
+"Allow display to sleep" = "允许显示器休眠";
+"macControl.awake.description" = "会阻止 Mac 因闲置进入系统睡眠。默认允许屏幕熄灭；取消勾选后，也会阻止显示器因闲置熄灭。";
+"Start Keep Awake for 1 Hour" = "保持唤醒 1 小时";
+"Couldn't Start Keep Awake" = "无法启动保持唤醒";
+"macControl.keepAwake.lowBatteryBlocked" = "电池电量低于保护阈值，保持唤醒未启动。";
+"macControl.keepAwake.assertionFailed" = "macOS 未能创建电源管理断言，保持唤醒未启动。";
+"Stop Keep Awake below" = "电量低于此值时结束保持唤醒";
+"Battery threshold" = "电池阈值";
+"Keep awake when connected to power" = "接通电源时保持唤醒";
+"Keep awake while these apps run" = "以下应用运行时保持唤醒";
+"Refresh" = "刷新";
+"macControl.apps.none" = "当前没有符合条件的运行中应用。";
+" (not running)" = "（未运行）";
+"macControl.apps.description" = "所选应用运行时会创建独立会话，不会结束手动创建的会话。";
+"Closed-Lid Mode" = "合盖保持运行";
+"Allow Mac to keep running with lid closed" = "合盖时允许 Mac 继续运行";
+"macControl.closedLid.unavailable" = "需要在系统设置中批准 AmorDrop 的特权辅助组件后才能启用。";
+"Lock the user session when the lid closes" = "合盖时锁定用户会话";
+"macControl.closedLid.lockDefault" = "AmorDrop 不修改 macOS 的锁屏或认证设置。启用前请用 Control-Command-Q 手动锁定；合盖锁屏行为仍需在本机实测。";
+"Set up Closed-Lid Mode…" = "设置合盖保持运行…";
+"Closed-Lid Mode Needs Setup" = "合盖保持运行尚未设置";
+"macControl.closedLid.setupRequired" = "要启用合盖模式，需要将 AmorDrop 的特权 LaunchDaemon 注册到 macOS；macOS 会要求管理员批准。它只会在你启动合盖会话时临时设置 pmset disablesleep=1，开始前保存当前值，并在结束、AmorDrop 退出/断连、低电量或辅助进程重启时尝试恢复。此请求尚未执行，也没有修改系统设置。";
+"Mac Controls" = "Mac 控制";
+"Request Helper Approval" = "请求批准辅助组件";
+"Open Login Items Settings" = "打开登录项设置";
+"Start Closed-Lid Mode…" = "启动合盖保持运行…";
+"End Closed-Lid Mode" = "结束合盖保持运行";
+"Start Closed-Lid Mode" = "启动合盖保持运行";
+"Start Closed-Lid Mode?" = "要启动合盖保持运行吗？";
+"Closed-Lid Mode Error" = "合盖保持运行出错";
+"macControl.closedLid.helperFailure" = "辅助组件无法完成操作。系统睡眠设置可能需要恢复。";
+"macControl.closedLid.active" = "合盖保持运行已开启。低电量保护会由辅助组件持续监控。";
+"macControl.closedLid.ready" = "辅助组件已获批准。启动会话时才会临时修改系统睡眠设置。";
+"macControl.closedLid.approvalRequired" = "请在系统设置 → 通用 → 登录项中批准 AmorDrop 辅助组件。";
+"macControl.closedLid.helperMissing" = "当前应用包未包含合盖辅助组件。";
+"macControl.closedLid.sessionWarning" = "会话期间 AmorDrop 会临时设置 pmset disablesleep=1，并保存原始值；结束、退出、断连、低电量或辅助进程重启时会恢复。此操作可能导致耗电和发热。AmorDrop 不更改锁屏/认证设置，也不能保证合盖后用户会话自动锁定；请先用 Control-Command-Q 手动锁定，并只在你接受该风险时继续。";
+"Keyboard Cleaning Lock" = "键盘清洁锁";
+"macControl.keyboard.shortcut" = "解锁：按住 Control + Option + Command + L 两秒。";
+"Keyboard lock starting" = "键盘即将锁定";
+"Keyboard Locked" = "键盘已锁定";
+"Lock Keyboard" = "锁定键盘";
+"Unlock Keyboard" = "解锁键盘";
+"Permission Required" = "需要权限";
+"Unavailable" = "不可用";
+"Keyboard Lock Permission Required" = "键盘锁需要权限";
+"macControl.keyboard.permissionGuide" = "打开“系统设置 → 隐私与安全性 → 输入监控”，允许 AmorDrop。然后退出并重新打开 AmorDrop，再试一次。";
+"Open Input Monitoring Settings" = "打开输入监控设置";
+"Cancel" = "取消";
+"Keyboard Lock Unavailable" = "键盘锁不可用";
+"macControl.keyboard.unavailable" = "macOS 未允许启动键盘事件监听，键盘输入没有被拦截。";
+"End Session" = "结束会话";
+"Until…" = "直到…";
+"30 minutes" = "30 分钟";
+"Keep Awake Until" = "保持唤醒直到";
+"Start" = "开始";
+"Connected to power" = "已接通电源";
+"On battery" = "使用电池";
+"Battery status unavailable" = "无法读取电池状态";
+
 "Language" = "语言";
 "language.system" = "系统默认";
 "settings.language.description" = "仅为本应用覆盖 macOS 的系统语言。";
@@ -24,6 +85,7 @@
 "Quit & Reopen" = "退出并重新打开";
 
 "Keep Mac Awake" = "保持 Mac 唤醒";
+"On" = "已开启";
 "Activate for" = "持续时间";
 "Indefinitely" = "无限制";
 "5 minutes" = "5 分钟";
@@ -163,3 +225,9 @@
 "undo.clear-shelf" = "撤销清空搁架";
 "undo.move-to-trash" = "撤销移到废纸篓";
 "undo.move-to-trash-count" = "撤销移到废纸篓 (%lld)";
+
+"Remove Helper…" = "移除辅助组件…";
+"Refresh Status" = "刷新状态";
+"Remove Helper" = "移除辅助组件";
+"Remove AmorDrop Helper?" = "要移除 AmorDrop 辅助组件吗？";
+"macControl.closedLid.removeWarning" = "先结束并恢复活动会话，然后从 macOS 登录项中取消注册辅助组件。此操作需要管理员批准；如果原始睡眠设置无法确认恢复，辅助组件会拒绝移除。";

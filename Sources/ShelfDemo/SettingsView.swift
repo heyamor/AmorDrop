@@ -22,6 +22,7 @@ enum ShelfExpiry: Int, CaseIterable, Identifiable {
 }
 
 struct SettingsView: View {
+    let macControl: MacControlCoordinator
     @AppStorage("shelf.expiryDays") private var expiryDays: Int = ShelfExpiry.never.rawValue
     @AppStorage("shelf.autoParkTopRight") private var autoParkTopRight: Bool = false
     @AppStorage("shelf.closeOnOutsideClick") private var closeOnOutsideClick: Bool = false
@@ -34,100 +35,110 @@ struct SettingsView: View {
     @State private var pickedLanguage: AppLanguage = LanguagePreference.current
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text(L("Settings"))
-                .font(.system(size: 17, weight: .semibold))
+        ScrollView(.vertical) {
+            VStack(alignment: .leading, spacing: 18) {
+                Text(L("Settings"))
+                    .font(.system(size: 17, weight: .semibold))
 
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("Auto-delete shelves"))
-                    .font(.system(size: 13, weight: .medium))
-                Picker("", selection: $expiryDays) {
-                    ForEach(ShelfExpiry.allCases) { opt in
-                        Text(opt.label).tag(opt.rawValue)
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("Auto-delete shelves"))
+                        .font(.system(size: 13, weight: .medium))
+                    Picker("", selection: $expiryDays) {
+                        ForEach(ShelfExpiry.allCases) { opt in
+                            Text(opt.label).tag(opt.rawValue)
+                        }
                     }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+                    // The .menu Picker bridges to NSPopUpButton and caches its
+                    // option Text views, so the dropdown doesn't relabel when
+                    // the language flips. A fresh identity on language change
+                    // forces it to rebuild from scratch.
+                    .id(pickedLanguage)
+
+                    Text(L("settings.expiry.description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
-                // The .menu Picker bridges to NSPopUpButton and caches its
-                // option Text views, so the dropdown doesn't relabel when
-                // the language flips. A fresh identity on language change
-                // forces it to rebuild from scratch.
-                .id(pickedLanguage)
 
-                Text(L("settings.expiry.description"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                Divider()
 
-            Divider()
+                MacControlSettingsSection(
+                    coordinator: macControl,
+                    keepAwake: macControl.keepAwake,
+                    closedLid: macControl.closedLid
+                )
 
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle(L("Park new shelves at the top-right corner"), isOn: $autoParkTopRight)
-                    .toggleStyle(.switch)
-                Text(L("settings.park.description"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+                Divider()
 
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle(L("Collapse expanded shelf when clicking outside"), isOn: $closeOnOutsideClick)
-                    .toggleStyle(.switch)
-                Text(L("settings.collapse.description"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Text(L("Language"))
-                    .font(.system(size: 13, weight: .medium))
-                // Custom binding so the LanguagePreference write happens
-                // synchronously inside the Picker's setter, before SwiftUI
-                // tears down anything in response to the @State change.
-                // .onChange is unreliable here — when the surrounding view
-                // gets re-identified by a peer Picker's .id(), the handler
-                // can be discarded before it runs.
-                Picker("", selection: Binding(
-                    get: { pickedLanguage },
-                    set: { newValue in
-                        pickedLanguage = newValue
-                        LanguagePreference.current = newValue
-                    }
-                )) {
-                    ForEach(AppLanguage.allCases) { lang in
-                        Text(lang.displayName).tag(lang)
-                    }
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(L("Park new shelves at the top-right corner"), isOn: $autoParkTopRight)
+                        .toggleStyle(.switch)
+                    Text(L("settings.park.description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
-                .labelsHidden()
-                .pickerStyle(.menu)
 
-                Text(L("settings.language.description"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(L("Collapse expanded shelf when clicking outside"), isOn: $closeOnOutsideClick)
+                        .toggleStyle(.switch)
+                    Text(L("settings.collapse.description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(L("Language"))
+                        .font(.system(size: 13, weight: .medium))
+                    // Custom binding so the LanguagePreference write happens
+                    // synchronously inside the Picker's setter, before SwiftUI
+                    // tears down anything in response to the @State change.
+                    // .onChange is unreliable here — when the surrounding view
+                    // gets re-identified by a peer Picker's .id(), the handler
+                    // can be discarded before it runs.
+                    Picker("", selection: Binding(
+                        get: { pickedLanguage },
+                        set: { newValue in
+                            pickedLanguage = newValue
+                            LanguagePreference.current = newValue
+                        }
+                    )) {
+                        ForEach(AppLanguage.allCases) { lang in
+                            Text(lang.displayName).tag(lang)
+                        }
+                    }
+                    .labelsHidden()
+                    .pickerStyle(.menu)
+
+                    Text(L("settings.language.description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Divider()
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Toggle(L("Launch at login"), isOn: Binding(
+                        get: { launchAtLogin },
+                        set: { newValue in applyLaunchAtLogin(newValue) }
+                    ))
+                    .toggleStyle(.switch)
+                    Text(L("settings.launch.description"))
+                        .font(.system(size: 11))
+                        .foregroundStyle(.secondary)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+
             }
-
-            Divider()
-
-            VStack(alignment: .leading, spacing: 6) {
-                Toggle(L("Launch at login"), isOn: Binding(
-                    get: { launchAtLogin },
-                    set: { newValue in applyLaunchAtLogin(newValue) }
-                ))
-                .toggleStyle(.switch)
-                Text(L("settings.launch.description"))
-                    .font(.system(size: 11))
-                    .foregroundStyle(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
-
+            .padding(20)
         }
-        .padding(20)
-        .frame(width: 380, alignment: .leading)
+        .frame(width: 420, height: 620)
         .onAppear {
             launchAtLogin = LaunchAtLoginManager.isEnabled
             pickedLanguage = LanguagePreference.current

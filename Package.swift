@@ -5,11 +5,25 @@ let package = Package(
     name: "ShelfDemo",
     defaultLocalization: "en",
     platforms: [.macOS("27.0")],
+    products: [
+        .executable(name: "ShelfDemo", targets: ["ShelfDemo"]),
+        .executable(name: "AmorDropClosedLidHelper", targets: ["AmorDropClosedLidHelper"]),
+        .library(name: "ClosedLidCore", targets: ["ClosedLidCore"]),
+    ],
     dependencies: [],
     targets: [
+        .target(
+            name: "ClosedLidCore",
+            path: "Sources/ClosedLidCore"
+        ),
+        .executableTarget(
+            name: "AmorDropClosedLidHelper",
+            dependencies: ["ClosedLidCore"],
+            path: "Sources/AmorDropClosedLidHelper"
+        ),
         .executableTarget(
             name: "ShelfDemo",
-            dependencies: [],
+            dependencies: ["ClosedLidCore"],
             path: "Sources/ShelfDemo",
             // The .icns is consumed only by the packaged .app bundle (copied
             // by scripts/build-private-app.sh). Excluding it here keeps SwiftPM
@@ -21,7 +35,7 @@ let package = Package(
         ),
         .testTarget(
             name: "ShelfDemoTests",
-            dependencies: ["ShelfDemo"],
+            dependencies: ["ShelfDemo", "ClosedLidCore"],
             path: "Tests/ShelfDemoTests"
         ),
     ]
