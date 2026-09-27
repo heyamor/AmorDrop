@@ -178,8 +178,8 @@ struct ShelfContainerView: View {
         ) as? [NSFilePromiseReceiver], !receivers.isEmpty {
             let queue = OperationQueue()
             queue.qualityOfService = .userInitiated
-            let dest = FileManager.default.temporaryDirectory
             for receiver in receivers {
+                guard let dest = ShelfTemporaryFiles.uniqueDirectoryURL() else { continue }
                 receiver.receivePromisedFiles(
                     atDestination: dest,
                     options: [:],
@@ -187,9 +187,19 @@ struct ShelfContainerView: View {
                 ) { url, error in
                     if let error {
                         NSLog("Shelf: file promise failed — \(error)")
+                        ShelfTemporaryFiles.removeIfOwned(dest, markedOwned: true)
                         return
                     }
-                    Task { @MainActor in manager.addFile(url: url, to: target) }
+                    Task { @MainActor in
+                        let item = manager.addFile(
+                            url: url,
+                            to: target,
+                            isOwnedTemporaryFile: true
+                        )
+                        if item == nil {
+                            manager.discardStagedTemporaryFileIfUnreferenced(at: url)
+                        }
+                    }
                 }
             }
             return true
@@ -211,13 +221,14 @@ struct ShelfContainerView: View {
                 let hash = SHA256.hash(data: png)
                     .map { String(format: "%02x", $0) }
                     .joined().prefix(16)
-                let tmp = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("Shelf-\(hash).png")
+                guard let tmp = ShelfTemporaryFiles.namedFileURL("Shelf-\(hash).png") else {
+                    continue
+                }
                 do {
                     if !FileManager.default.fileExists(atPath: tmp.path) {
                         try png.write(to: tmp)
                     }
-                    manager.addFile(url: tmp, to: target)
+                    manager.addFile(url: tmp, to: target, isOwnedTemporaryFile: true)
                     staged = true
                 } catch {
                     NSLog("Shelf: failed to write dropped image: \(error)")
@@ -313,7 +324,8 @@ private struct DockedTabView: View {
     @State private var hovering = false
 
     var body: some View {
-        Color.clear
+        WindowDragHandle(onTap: onExpand)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
             .overlay {
                 Image(systemName: "chevron.left")
                     .font(.system(size: 13, weight: .semibold))
@@ -339,7 +351,6 @@ private struct DockedTabView: View {
                     .allowsHitTesting(false)
             )
             .onHover { hovering = $0 }
-            .onTapGesture(perform: onExpand)
             .animation(.easeOut(duration: 0.15), value: dropTargeted)
             .animation(.easeOut(duration: 0.15), value: hovering)
     }
@@ -449,6 +460,11 @@ private struct ExpandedShelfView: View {
         // button, or the reveal pill. ShelfDragOverlay's NSView consumes
         // tile clicks before they reach this gesture, so this only fires
         // on empty/black-space clicks.
+        .overlay(alignment: .top) {
+            GrabHandle(onTap: onDock)
+                .frame(maxWidth: .infinity, alignment: .top)
+                .zIndex(2)
+        }
         .contentShape(Rectangle())
         .onTapGesture {
             selection.removeAll()

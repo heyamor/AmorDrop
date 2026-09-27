@@ -21,6 +21,10 @@ struct ShelfItem: Identifiable, Equatable {
     let pixelSize: CGSize?
     let pageCount: Int?
     let isDirectory: Bool
+    /// True only for files AmorDrop created in `ShelfTemporaryFiles` for
+    /// staged image, text, or file-promise data. A URL alone never implies
+    /// ownership and must not be enough to authorize deletion.
+    let isOwnedTemporaryFile: Bool
     /// Recursive total of bytes owned by a directory item. Populated lazily
     /// in the background by `ShelfManager.recomputeFolderSize` because
     /// `URLResourceKey.fileSizeKey` on a directory returns ~0 instead of the
@@ -39,7 +43,8 @@ struct ShelfItem: Identifiable, Equatable {
         pixelSize: CGSize? = nil,
         pageCount: Int? = nil,
         isDirectory: Bool = false,
-        cachedFolderBytes: Int64? = nil
+        cachedFolderBytes: Int64? = nil,
+        isOwnedTemporaryFile: Bool = false
     ) {
         self.id = id
         self.type = type
@@ -52,6 +57,7 @@ struct ShelfItem: Identifiable, Equatable {
         self.pageCount = pageCount
         self.isDirectory = isDirectory
         self.cachedFolderBytes = cachedFolderBytes
+        self.isOwnedTemporaryFile = isOwnedTemporaryFile
     }
 
     var displayName: String {
@@ -72,22 +78,16 @@ struct ShelfItem: Identifiable, Equatable {
     }
 
     /// Writes a pasted/dropped text snippet to a deterministic `.txt` file in
-    /// the system temp dir so the snippet has a real backing fileURL. That URL
-    /// is what makes "Open" (TextEdit) and "Reveal in Finder" work for text
-    /// items — both go through `NSWorkspace` APIs that need a file path. The
-    /// content hash makes the path stable across re-pastes of the same text.
+    /// AmorDrop's private temp directory so the snippet has a real backing
+    /// fileURL. The content hash makes the path stable across re-pastes of
+    /// the same text without exposing the snippet in its filename.
     static func writeTextToTemp(_ text: String) -> URL? {
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        let firstLine = trimmed.components(separatedBy: .newlines).first ?? ""
-        let stem = String(firstLine.prefix(40))
-            .replacingOccurrences(of: "/", with: "-")
-            .replacingOccurrences(of: ":", with: "-")
-        let safeStem = stem.isEmpty ? "Snippet" : stem
         let hash = SHA256.hash(data: Data(text.utf8))
             .map { String(format: "%02x", $0) }
-            .joined().prefix(8)
-        let url = FileManager.default.temporaryDirectory
-            .appendingPathComponent("\(safeStem)-\(hash).txt")
+            .joined().prefix(16)
+        guard let url = ShelfTemporaryFiles.namedFileURL("Snippet-\(hash).txt") else {
+            return nil
+        }
         do {
             if !FileManager.default.fileExists(atPath: url.path) {
                 try text.write(to: url, atomically: true, encoding: .utf8)

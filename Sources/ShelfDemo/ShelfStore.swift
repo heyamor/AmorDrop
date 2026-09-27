@@ -7,6 +7,8 @@ private struct PersistedShelfItem: Codable {
     let bookmark: Data?
     let text: String?
     let createdAt: Date
+    // Optional so existing shelf.json records remain decodable.
+    let ownedTemporaryFile: Bool?
 }
 
 private struct PersistedShelf: Codable {
@@ -64,7 +66,7 @@ final class ShelfStore {
             )
         }
         let payload = PersistedStore(
-            version: 3,
+            version: 4,
             shelves: records,
             currentShelfID: currentShelfID
         )
@@ -95,7 +97,8 @@ final class ShelfStore {
             type: typeKey(item.type),
             bookmark: bookmark,
             text: item.textContent,
-            createdAt: item.createdAt
+            createdAt: item.createdAt,
+            ownedTemporaryFile: item.isOwnedTemporaryFile
         )
     }
 
@@ -140,7 +143,9 @@ final class ShelfStore {
                             createdAt: record.createdAt,
                             pixelSize: pixelSize,
                             pageCount: pageCount,
-                            isDirectory: isDir.boolValue
+                            isDirectory: isDir.boolValue,
+                            isOwnedTemporaryFile: record.ownedTemporaryFile == true
+                                && ShelfTemporaryFiles.owns(url)
                         ))
                         if stale { anyStale = true }
                     }
@@ -155,7 +160,8 @@ final class ShelfStore {
                         fileURL: url,
                         textContent: text,
                         thumbnail: nil,
-                        createdAt: record.createdAt
+                        createdAt: record.createdAt,
+                        isOwnedTemporaryFile: url != nil
                     ))
                 }
             }

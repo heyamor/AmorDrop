@@ -76,6 +76,12 @@ final class FloatingPanel<Content: View>: NSPanel {
 /// to key state and the underlying SwiftUI view never sees the event.
 private final class FirstMouseHostingView<Content: View>: NSHostingView<Content> {
     override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    // SwiftUI's hosting view receives background mouse events. Allow AppKit to
+    // move the borderless shelf from those areas; file tiles use
+    // DragInitiatorView, which explicitly returns false so file drags remain
+    // owned by the drag source.
+    override var mouseDownCanMoveWindow: Bool { true }
 }
 
 /// Injects `QuickLookController.shared` into the shelf panel's responder chain
@@ -116,5 +122,49 @@ private struct FloatingPanelContent<Content: View>: View {
             content
         }
         .ignoresSafeArea()
+    }
+}
+
+/// An explicit AppKit drag region for borderless shelf panels. SwiftUI tap and
+/// drag gestures can prevent `isMovableByWindowBackground` from moving a panel,
+/// so this view starts an AppKit window drag once the pointer crosses the
+/// system drag threshold. A click still invokes the handle's normal action.
+struct WindowDragHandle: NSViewRepresentable {
+    var onTap: () -> Void = {}
+
+    func makeNSView(context: Context) -> WindowDragHandleView {
+        let view = WindowDragHandleView()
+        view.onTap = onTap
+        return view
+    }
+
+    func updateNSView(_ view: WindowDragHandleView, context: Context) {
+        view.onTap = onTap
+    }
+}
+
+final class WindowDragHandleView: NSView {
+    var onTap: () -> Void = {}
+    private var mouseDownEvent: NSEvent?
+    private var didStartWindowDrag = false
+
+    override var mouseDownCanMoveWindow: Bool { false }
+    override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+    override func mouseDown(with event: NSEvent) {
+        mouseDownEvent = event
+        didStartWindowDrag = false
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard !didStartWindowDrag, let mouseDownEvent, let window else { return }
+        didStartWindowDrag = true
+        window.performDrag(with: mouseDownEvent)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        defer { mouseDownEvent = nil }
+        guard !didStartWindowDrag else { return }
+        onTap()
     }
 }

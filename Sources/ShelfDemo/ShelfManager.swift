@@ -128,7 +128,9 @@ final class ShelfManager: ObservableObject {
     }
 
     func removeShelf(id: UUID) {
+        let removed = shelves.first { $0.id == id }?.items ?? []
         shelves.removeAll { $0.id == id }
+        removeUnreferencedTemporaryFiles(from: removed)
     }
 
     /// Sets a custom display name for a shelf. Pass nil/empty to clear.
@@ -154,8 +156,8 @@ final class ShelfManager: ObservableObject {
 
     /// Removes shelves whose last activity (most recent item add, falling back
     /// to shelf createdAt) is older than `days`. Expiry removes shelf entries
-    /// only. A temporary-directory URL does not prove that we own a file, so
-    /// expiry must never delete backing files.
+    /// and app-owned staged files only after their last shelf reference is gone.
+    /// Arbitrary temporary URLs never imply ownership.
     /// Returns the IDs of the shelves that were pruned so callers can close
     /// any associated UI.
     @discardableResult
@@ -171,7 +173,9 @@ final class ShelfManager: ObservableObject {
         guard !expired.isEmpty else { return [] }
 
         let ids = expired.map(\.id)
+        let removedItems = expired.flatMap(\.items)
         shelves.removeAll { ids.contains($0.id) }
+        removeUnreferencedTemporaryFiles(from: removedItems)
         return ids
     }
 
@@ -192,16 +196,59 @@ final class ShelfManager: ObservableObject {
 
     func removeItem(id itemID: UUID, from shelfID: UUID) {
         guard let idx = index(of: shelfID) else { return }
+        let removed = shelves[idx].items.filter { $0.id == itemID }
         shelves[idx].items.removeAll { $0.id == itemID }
+        removeUnreferencedTemporaryFiles(from: removed)
     }
 
     func clear(shelfID: UUID) {
         guard let idx = index(of: shelfID) else { return }
         let removed = shelves[idx].items
+        guard !removed.isEmpty else { return }
         shelves[idx].items.removeAll()
-        if !removed.isEmpty {
-            undoSnapshot = .clearShelf(shelfID: shelfID, items: removed)
+
+        // Preserve Undo for original source files. Owned staged copies are
+        // omitted if clearing removes their last shelf reference. Text rows
+        // retain their text and are re-staged if the user chooses Undo.
+        let undoItems = removed.compactMap { item -> ShelfItem? in
+            if item.type == .text {
+                return ShelfItem(
+                    id: item.id,
+                    type: .text,
+                    textContent: item.textContent,
+                    createdAt: item.createdAt
+                )
+            }
+            if item.isOwnedTemporaryFile {
+                guard let url = item.fileURL,
+                      isReferenced(url, in: shelves) else { return nil }
+            }
+            return item
         }
+        undoSnapshot = undoItems.isEmpty
+            ? nil
+            : .clearShelf(shelfID: shelfID, items: undoItems)
+        removeUnreferencedTemporaryFiles(from: removed)
+    }
+
+    private func removeUnreferencedTemporaryFiles(from items: [ShelfItem]) {
+        for item in items where item.isOwnedTemporaryFile {
+            guard let url = item.fileURL,
+                  !isReferenced(url, in: shelves) else { continue }
+            ShelfTemporaryFiles.removeIfOwned(url, markedOwned: true)
+        }
+    }
+
+    private func isReferenced(_ url: URL, in shelves: [Shelf]) -> Bool {
+        let path = url.standardizedFileURL.path
+        return shelves.contains { shelf in
+            shelf.items.contains { $0.fileURL?.standardizedFileURL.path == path }
+        }
+    }
+
+    func discardStagedTemporaryFileIfUnreferenced(at url: URL) {
+        guard !isReferenced(url, in: shelves) else { return }
+        ShelfTemporaryFiles.removeIfOwned(url, markedOwned: true)
     }
 
     // MARK: - Undo
@@ -243,8 +290,23 @@ final class ShelfManager: ObservableObject {
         switch snapshot {
         case .clearShelf(let shelfID, let items):
             guard let idx = index(of: shelfID) else { return }
+            let restored = items.map { item -> ShelfItem in
+                guard item.type == .text, item.fileURL == nil,
+                      let text = item.textContent else { return item }
+                let url = ShelfItem.writeTextToTemp(text)
+                return ShelfItem(
+                    id: item.id,
+                    type: .text,
+                    fileURL: url,
+                    textContent: text,
+                    thumbnail: item.thumbnail,
+                    thumbnailIsIcon: item.thumbnailIsIcon,
+                    createdAt: item.createdAt,
+                    isOwnedTemporaryFile: url != nil
+                )
+            }
             withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                shelves[idx].items.append(contentsOf: items)
+                shelves[idx].items.append(contentsOf: restored)
             }
         case .moveToTrash(let shelfID, let items, let trashedURLs):
             // Move trashed files back to their original location before
@@ -346,12 +408,13 @@ final class ShelfManager: ObservableObject {
             pixelSize: old.pixelSize,
             pageCount: old.pageCount,
             isDirectory: old.isDirectory,
-            cachedFolderBytes: old.cachedFolderBytes
+            cachedFolderBytes: old.cachedFolderBytes,
+            isOwnedTemporaryFile: false
         )
     }
 
     @discardableResult
-    func addFile(url: URL, to shelfID: UUID) -> ShelfItem? {
+    func addFile(url: URL, to shelfID: UUID, isOwnedTemporaryFile: Bool = false) -> ShelfItem? {
         guard index(of: shelfID) != nil else { return nil }
         if containsFile(url: url, in: shelfID) {
             duplicateRejected.send(shelfID)
@@ -375,7 +438,14 @@ final class ShelfManager: ObservableObject {
             thumbnail: placeholder,
             pixelSize: pixelSize,
             pageCount: pageCount,
-            isDirectory: isDirectory
+            isDirectory: isDirectory,
+            isOwnedTemporaryFile: isOwnedTemporaryFile ||
+                shelves.contains { shelf in
+                    shelf.items.contains {
+                        $0.isOwnedTemporaryFile
+                            && $0.fileURL?.standardizedFileURL.path == url.standardizedFileURL.path
+                    }
+                }
         )
         addItem(item, to: shelfID)
         if isDirectory {
@@ -420,7 +490,8 @@ final class ShelfManager: ObservableObject {
             pixelSize: old.pixelSize,
             pageCount: old.pageCount,
             isDirectory: old.isDirectory,
-            cachedFolderBytes: bytes
+            cachedFolderBytes: bytes,
+            isOwnedTemporaryFile: old.isOwnedTemporaryFile
         )
     }
 
@@ -451,7 +522,12 @@ final class ShelfManager: ObservableObject {
         // snippet preview still renders from `textContent`; the fileURL is
         // there purely to make the standard file actions reachable.
         let url = ShelfItem.writeTextToTemp(text)
-        let item = ShelfItem(type: .text, fileURL: url, textContent: text)
+        let item = ShelfItem(
+            type: .text,
+            fileURL: url,
+            textContent: text,
+            isOwnedTemporaryFile: url != nil
+        )
         addItem(item, to: shelfID)
         return item
     }
@@ -481,11 +557,10 @@ final class ShelfManager: ObservableObject {
                     let bitmap = NSBitmapImageRep(data: tiff),
                     let png = bitmap.representation(using: .png, properties: [:])
                 else { continue }
-                let url = FileManager.default.temporaryDirectory
-                    .appendingPathComponent("Shelf-\(UUID().uuidString).png")
+                guard let url = ShelfTemporaryFiles.uniqueFileURL(extension: "png") else { continue }
                 do {
                     try png.write(to: url)
-                    addFile(url: url, to: shelfID)
+                    addFile(url: url, to: shelfID, isOwnedTemporaryFile: true)
                     added += 1
                 } catch {
                     NSLog("Shelf: failed to save clipboard image: \(error)")
@@ -520,7 +595,8 @@ final class ShelfManager: ObservableObject {
                     pixelSize: old.pixelSize,
                     pageCount: old.pageCount,
                     isDirectory: old.isDirectory,
-                    cachedFolderBytes: old.cachedFolderBytes
+                    cachedFolderBytes: old.cachedFolderBytes,
+                    isOwnedTemporaryFile: old.isOwnedTemporaryFile
                 )
                 // Crossfade the skeleton/icon → real preview swap so it
                 // doesn't read as a hard pop.

@@ -83,10 +83,14 @@ struct CollapsedShelfView: View {
                     DocumentsPill(title: pillTitle, action: onOpenDocuments)
                 }
 
-                GrabHandle(onTap: onDock)
-                    .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-                    .offset(y: -12)
             }
+
+            // Keep a dedicated window-drag target present even when the shelf
+            // is empty. File tiles keep their separate drag source regions.
+            GrabHandle(onTap: onDock)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .offset(y: -12)
+                .zIndex(2)
         }
     }
 }
@@ -391,17 +395,19 @@ struct GrabHandle: View {
     @State private var hovering = false
 
     var body: some View {
-        Capsule(style: .continuous)
-            .fill(Color.white.opacity(hovering ? 0.75 : 0.28))
-            .frame(width: 40, height: 4)
-            .shadow(color: Color.white.opacity(hovering ? 0.55 : 0),
-                    radius: hovering ? 6 : 0)
-            .padding(.vertical, 10)
-            .padding(.horizontal, 16)
-            .contentShape(Rectangle())
-            .onHover { hovering = $0 }
-            .onTapGesture { onTap?() }
-            .animation(.easeOut(duration: 0.15), value: hovering)
+        ZStack {
+            Capsule(style: .continuous)
+                .fill(Color.white.opacity(hovering ? 0.75 : 0.28))
+                .frame(width: 40, height: 4)
+                .shadow(color: Color.white.opacity(hovering ? 0.55 : 0),
+                        radius: hovering ? 6 : 0)
+                .allowsHitTesting(false)
+            WindowDragHandle { onTap?() }
+        }
+        .frame(width: 72, height: 24)
+        .contentShape(Rectangle())
+        .onHover { hovering = $0 }
+        .animation(.easeOut(duration: 0.15), value: hovering)
     }
 }
 
