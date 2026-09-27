@@ -1,6 +1,6 @@
 # AmorDrop
 
-AmorDrop 是一款供个人使用的原生 macOS 文件暂存架，基于 Suman Pokharel 的 [Dropshit](https://github.com/iamsumanp/Dropshit)。它保留了原项目的 SwiftUI/AppKit 搁架和拖放实现，移除了自动更新器，并为这台 Mac 使用本地 App 应用包。
+AmorDrop 是一款原生 macOS 文件暂存架，基于 Suman Pokharel 的 [Dropshit](https://github.com/iamsumanp/Dropshit)。当前预览版面向 Apple Silicon，最低支持 macOS 15.6，供本人和朋友试用。它保留了原项目的 SwiftUI/AppKit 搁架和拖放实现，并移除了自动更新器。
 
 ## 使用方法
 
@@ -14,23 +14,23 @@ AmorDrop 是一款供个人使用的原生 macOS 文件暂存架，基于 Suman 
 
 ## 构建与安装
 
-需要完整安装 Xcode 27，并使用匹配的 Swift 工具链和 macOS 27 SDK。本版本仅面向 Apple Silicon。在项目目录中运行：
+需要完整安装 Xcode 27，并使用匹配的 Swift 工具链和 macOS SDK。本版本仅面向 Apple Silicon，最低系统版本为 macOS 15.6。在项目目录中运行：
 
 ```sh
 bash scripts/build-private-app.sh
 ```
 
-此脚本会构建 `build/AmorDrop.app`，其 Bundle Identifier 为 `com.amor.personal.amordrop`，仅显示在菜单栏，并使用本机临时签名。签名过程会在专用临时目录中进行，避免 Documents 文件提供器的元数据干扰签名。安装时，将 App 拷贝到 `/Applications` 后打开即可。搁架和快捷键不需要 Developer ID、Apple 公证、账号或网络连接。macOS 可能会询问是否允许访问受保护位置中的文件。
+此脚本会构建 `build/AmorDrop.app`，其 Bundle Identifier 为 `com.amor.personal.amordrop`，仅显示在菜单栏，并使用本机临时签名。签名过程会在专用临时目录中进行，避免 Documents 文件提供器的元数据干扰签名。安装时，将 App 拷贝到 `/Applications` 后打开即可。发布包没有 Developer ID 签名或 Apple 公证；macOS 可能会拦截首次打开。只有确认来源可信时，才在“系统设置 → 隐私与安全性”选择“仍要打开”。
 
 ## 本机验证记录
 
-在 Xcode 27 下，Release 构建和 44 项 XCTest 测试均通过，安装后的 App 也成功启动。实机检查覆盖了搁架创建、七种测试文件的名称和缩略图、Quick Look、清空、撤销、关闭与重新打开，以及 Finder 复制 → 搁架粘贴 → 从搁架复制 → Finder 粘贴流程，并比对了文件内容哈希。自动化测试覆盖多个搁架、文件承诺安全、ZIP 压缩包、PNG/JPEG 转换和 Shake 手势识别算法。
+在 Xcode 27 下，`amordrop-v1.0.0` 基线的 Release 构建和 44 项 XCTest 测试通过，且完成了针对 macOS 27 的人工验收。当前 macOS 15.6 兼容预览版的构建与测试状态见对应 GitHub Release；当前主机运行 macOS 27，尚未在 macOS 15.6 实机上完成人工验证。
 
 2026-09-26，用户确认菜单栏图标、实体键盘 Control-Option-Space、Finder 拖住文件时通过 Shake 呼出搁架、Finder → 搁架 → Finder 的真实拖放，以及贴边停靠均正常。之后再次完成 Release 构建，44 项 XCTest 全部通过，且没有修改应用源码。此版本以附注标签 `amordrop-v1.0.0` 冻结为个人版 AmorDrop V1 基线。验证范围和构建产物信息见[基线记录](docs/V1-BASELINE.md)。浏览器上传区域的拖放和长时间睡眠/唤醒行为不在这轮验收范围内。
 
 ## 当前仓库状态
 
-`amordrop-v1.0.0` 标签标记了最后一次经人工验收的搁架基线。当前源码还包含尚在开发中的 Mac 控制和外部 App 拖放兼容性改动；这些改动尚未完成 Release 构建、全套测试或实机验收。上文的 44 项测试结果仅适用于 V1 基线。合盖保持运行属于独立的特权功能，启用前需要管理员明确授权。
+`amordrop-v1.0.0` 标签标记了最后一次经人工验收的搁架基线。当前 macOS 15.6 兼容版以预览版发布；Mac 控制与合盖保持运行仍需谨慎试用。合盖保持运行属于独立的特权功能，启用前需要管理员明确授权。macOS 15.6 的实机行为尚未验证。
 
 ## 隐私与文件处理
 
@@ -42,4 +42,4 @@ bash scripts/build-private-app.sh
 
 ## 项目范围
 
-这是一个供本机使用的版本。Sparkle、其更新源和发布打包流程已移除。上游源码中仍保留视频转换和 OCR 功能，但它们不属于本项目当前关注的核心使用流程。
+这是供本人和朋友试用的私人分支，不是 App Store 或商业发行版本。Sparkle、其更新源和原发布打包流程已移除。上游源码中仍保留视频转换和 OCR 功能，但它们不属于本项目当前关注的核心使用流程。

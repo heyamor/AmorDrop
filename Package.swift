@@ -4,7 +4,7 @@ import PackageDescription
 let package = Package(
     name: "ShelfDemo",
     defaultLocalization: "en",
-    platforms: [.macOS("27.0")],
+    platforms: [.macOS("15.6")],
     products: [
         .executable(name: "ShelfDemo", targets: ["ShelfDemo"]),
         .executable(name: "AmorDropClosedLidHelper", targets: ["AmorDropClosedLidHelper"]),
