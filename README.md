@@ -1,45 +1,45 @@
 # AmorDrop
 
-AmorDrop is a personal, native macOS file shelf based on [Dropshit](https://github.com/iamsumanp/Dropshit) by Suman Pokharel. It keeps the original SwiftUI/AppKit shelf and drag implementation, with the automatic updater removed and a local app bundle for this Mac.
+AmorDrop 是一款供个人使用的原生 macOS 文件暂存架，基于 Suman Pokharel 的 [Dropshit](https://github.com/iamsumanp/Dropshit)。它保留了原项目的 SwiftUI/AppKit 搁架和拖放实现，移除了自动更新器，并为这台 Mac 使用本地 App 应用包。
 
-## Use
+## 使用方法
 
-- Drag files from Finder and shake the pointer to summon a shelf, then release the files over it.
-- Drop more files, folders, images, PDFs, or text onto an open shelf.
-- Drag one or more items from a shelf into Finder or another app's drop target.
-- Press Space on a selected item for Quick Look. Shelf actions also include ZIP creation and image conversion.
-- Click the menu bar icon for new shelves and settings. Press Control-Option-Space anywhere to create a shelf.
-- Opening AmorDrop again from Finder summons a shelf if no window is visible.
-- Shelves stay available across launches. Shelf expiry defaults to Never.
+- 在 Finder 中拖住文件并晃动指针，呼出搁架，然后将文件放到搁架上。
+- 将更多文件、文件夹、图片、PDF 或文本拖到已打开的搁架中。
+- 将搁架中的一个或多个项目拖到 Finder 或其他 App 的接收区域。
+- 选中项目后按空格键使用 Quick Look 预览。搁架操作还支持创建 ZIP 和转换图片格式。
+- 点击菜单栏图标可新建搁架并打开设置。在任意位置按 Control-Option-Space 可创建搁架。
+- 如果没有可见窗口，从 Finder 再次打开 AmorDrop 会呼出一个搁架。
+- 搁架会在多次启动之间保留。搁架过期时间默认为“永不”。
 
-## Build and install
+## 构建与安装
 
-Requires complete Xcode 27 with the matching Swift toolchain and macOS 27 SDK. This build targets Apple Silicon only. From the project directory:
+需要完整安装 Xcode 27，并使用匹配的 Swift 工具链和 macOS 27 SDK。本版本仅面向 Apple Silicon。在项目目录中运行：
 
 ```sh
 bash scripts/build-private-app.sh
 ```
 
-This builds `build/AmorDrop.app`, with bundle identifier `com.amor.personal.amordrop`, menu-bar-only behavior, and an ad-hoc local signature. Signing takes place in a dedicated temporary directory to avoid Documents file-provider metadata interfering with the signature. To install it, copy the app bundle to `/Applications` and open it. No Developer ID, notarization, login account, or network connection is required for the shelf and shortcut. macOS may ask for access to files in protected locations.
+此脚本会构建 `build/AmorDrop.app`，其 Bundle Identifier 为 `com.amor.personal.amordrop`，仅显示在菜单栏，并使用本机临时签名。签名过程会在专用临时目录中进行，避免 Documents 文件提供器的元数据干扰签名。安装时，将 App 拷贝到 `/Applications` 后打开即可。搁架和快捷键不需要 Developer ID、Apple 公证、账号或网络连接。macOS 可能会询问是否允许访问受保护位置中的文件。
 
-## Verification on this Mac
+## 本机验证记录
 
-The Release build and 44 XCTest tests passed on Xcode 27. The installed app launched successfully. Live checks verified shelf creation, file names and thumbnails for seven fixture types, Quick Look, clearing, undo, closing/reopening, and the Finder-copy → Shelf-paste → Shelf-copy → Finder-paste workflow, including file-content hashes. Automated tests cover multiple shelves, file-promise safety, ZIP archives, PNG/JPEG conversion, and the shake recognition algorithm.
+在 Xcode 27 下，Release 构建和 44 项 XCTest 测试均通过，安装后的 App 也成功启动。实机检查覆盖了搁架创建、七种测试文件的名称和缩略图、Quick Look、清空、撤销、关闭与重新打开，以及 Finder 复制 → 搁架粘贴 → 从搁架复制 → Finder 粘贴流程，并比对了文件内容哈希。自动化测试覆盖多个搁架、文件承诺安全、ZIP 压缩包、PNG/JPEG 转换和 Shake 手势识别算法。
 
-On 2026-09-26, the owner confirmed that the menu bar icon, physical Control-Option-Space, shake-to-summon during a Finder file drag, real Finder → Shelf → Finder drag-and-drop, and edge docking all work normally. Release was rebuilt and all 44 XCTest tests passed again without application-source changes. This version is frozen as the personal AmorDrop V1 baseline under the annotated tag `amordrop-v1.0.0`. See [the baseline record](docs/V1-BASELINE.md) for verification scope and artifact identity. Browser upload drag-and-drop and long-duration sleep/wake behavior remain outside this acceptance round.
+2026-09-26，用户确认菜单栏图标、实体键盘 Control-Option-Space、Finder 拖住文件时通过 Shake 呼出搁架、Finder → 搁架 → Finder 的真实拖放，以及贴边停靠均正常。之后再次完成 Release 构建，44 项 XCTest 全部通过，且没有修改应用源码。此版本以附注标签 `amordrop-v1.0.0` 冻结为个人版 AmorDrop V1 基线。验证范围和构建产物信息见[基线记录](docs/V1-BASELINE.md)。浏览器上传区域的拖放和长时间睡眠/唤醒行为不在这轮验收范围内。
 
-## Repository status
+## 当前仓库状态
 
-The `amordrop-v1.0.0` tag marks the last manually accepted Shelf baseline. The current source snapshot also includes in-progress Mac Control and external-app drop compatibility changes. Those latest changes have not yet completed a Release build, the full test suite, or physical-device acceptance; the 44-test result above applies to the V1 baseline. Closed-Lid support is a separate privileged feature and requires explicit administrator approval before activation.
+`amordrop-v1.0.0` 标签标记了最后一次经人工验收的搁架基线。当前源码还包含尚在开发中的 Mac 控制和外部 App 拖放兼容性改动；这些改动尚未完成 Release 构建、全套测试或实机验收。上文的 44 项测试结果仅适用于 V1 基线。合盖保持运行属于独立的特权功能，启用前需要管理员明确授权。
 
-## Privacy and file handling
+## 隐私与文件处理
 
-The app has no analytics, account, cloud upload, or update service. It does not make network requests. Files dragged from Finder remain at their original locations; shelf entries reference them. Explicitly choosing **Move to Trash** moves the selected file to the macOS Trash. Shelf expiry removes entries only and never deletes backing files; expiry is off by default. Pasted snippets and images use temporary backing files.
+应用不包含数据分析、账号、云端上传或更新服务，也不会发起网络请求。从 Finder 拖入的文件仍保存在原位置，搁架条目只引用这些文件。只有明确选择“移到废纸篓”时，才会将选中的文件移入 macOS 废纸篓。搁架过期只会移除条目，不会删除对应文件；默认关闭过期清理。粘贴的文本片段和图片会使用临时文件保存。
 
-## Upstream attribution and license
+## 上游来源与许可证
 
-The upstream README identifies Dropshit as MIT-licensed, but the checked-out upstream revision did not contain a `LICENSE` file. This copy includes the standard MIT license text and credits the upstream author as Suman Pokharel (GitHub: `iamsumanp`). The original source attribution remains here and in `LICENSE`.
+上游 README 说明 Dropshit 使用 MIT 许可证，但当前检出的上游版本没有包含 `LICENSE` 文件。本仓库附有标准 MIT 许可证文本，并注明上游作者 Suman Pokharel（GitHub：`iamsumanp`）。上游来源说明也保留在本 README 和 `LICENSE` 文件中。
 
-## Scope
+## 项目范围
 
-This is a local personal build. Sparkle, its appcast, and release packaging have been removed. Video conversion and OCR remain in the upstream source, though they are outside the requested core workflow.
+这是一个供本机使用的版本。Sparkle、其更新源和发布打包流程已移除。上游源码中仍保留视频转换和 OCR 功能，但它们不属于本项目当前关注的核心使用流程。
