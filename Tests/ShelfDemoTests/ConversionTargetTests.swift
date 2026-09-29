@@ -1,6 +1,6 @@
 import XCTest
 import UniformTypeIdentifiers
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class ConversionTargetTests: XCTestCase {
     func test_heic_offers_jpeg_and_png() {

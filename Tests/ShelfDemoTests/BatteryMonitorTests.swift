@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class BatteryMonitorTests: XCTestCase {
     func test_reports_external_power_and_internal_battery_percentage() {

@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class UniqueDestinationTests: XCTestCase {
     var tempDir: URL!

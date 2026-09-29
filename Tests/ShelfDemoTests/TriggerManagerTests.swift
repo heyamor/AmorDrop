@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 @MainActor
 private final class TriggerTestPowerAssertions: PowerAssertionControlling {

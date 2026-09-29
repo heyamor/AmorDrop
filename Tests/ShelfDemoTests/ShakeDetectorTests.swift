@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class ShakeDetectorTests: XCTestCase {
     private func sweep(_ detector: ShakeDetector, start: Double, step: Double = 0.04) -> Int {

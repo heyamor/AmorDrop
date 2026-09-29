@@ -1,5 +1,6 @@
 import XCTest
-@testable import ShelfDemo
+import CoreGraphics
+@testable import AmorDrop
 
 final class KeyboardLockEventFilterTests: XCTestCase {
     private func input(
@@ -74,5 +75,41 @@ final class KeyboardLockEventFilterTests: XCTestCase {
         filter.unlockKeyboard()
 
         XCTAssertEqual(filter.handle(input(.keyDown, keyCode: 0)), .passThrough)
+    }
+}
+
+
+@MainActor
+final class KeyboardTapValidationTests: XCTestCase {
+    private func tap(mask: CGEventMask, enabled: Bool = true, passive: Bool = false, pid: pid_t = 42) -> CGEventTapInformation {
+        var info = CGEventTapInformation()
+        info.tappingProcess = pid
+        info.tapPoint = .cgSessionEventTap
+        info.options = passive ? .listenOnly : .defaultTap
+        info.enabled = enabled
+        info.eventsOfInterest = mask
+        return info
+    }
+
+    func test_complete_active_keyboard_tap_is_accepted() {
+        XCTAssertTrue(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: CGKeyboardLockMonitor.requiredKeyboardMask), processID: 42))
+    }
+
+    func test_enabled_modifier_only_tap_is_not_a_keyboard_lock() {
+        XCTAssertFalse(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: 1 << CGEventType.flagsChanged.rawValue), processID: 42))
+    }
+
+    func test_missing_key_up_is_rejected() {
+        let mask = CGKeyboardLockMonitor.requiredKeyboardMask & ~(1 << CGEventType.keyUp.rawValue)
+        XCTAssertFalse(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: mask), processID: 42))
+    }
+
+    func test_passive_listener_cannot_prove_keyboard_is_locked() {
+        XCTAssertFalse(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: CGKeyboardLockMonitor.requiredKeyboardMask, passive: true), processID: 42))
+    }
+
+    func test_disabled_or_other_process_tap_is_rejected() {
+        XCTAssertFalse(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: CGKeyboardLockMonitor.requiredKeyboardMask, enabled: false), processID: 42))
+        XCTAssertFalse(CGKeyboardLockMonitor.isCompleteKeyboardTap(tap(mask: CGKeyboardLockMonitor.requiredKeyboardMask, pid: 99), processID: 42))
     }
 }

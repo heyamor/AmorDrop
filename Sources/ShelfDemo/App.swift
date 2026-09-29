@@ -3,11 +3,18 @@ import Combine
 import SwiftUI
 
 @main
-struct ShelfDemoApp {
+struct AmorDropApp {
     static func main() {
         // Must run before any localized lookup — NSBundle reads
         // AppleLanguages once at first resolution.
         LanguagePreference.applyAtLaunch()
+
+        // Launch the installed bundle with this flag for a permission report.
+        // No prompt, event capture, keyboard suppression, or Mac Control session.
+        if CommandLine.arguments.contains("--keyboard-permission-diagnostic") {
+            print(CGKeyboardLockMonitor.permissionDiagnostic())
+            return
+        }
 
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
@@ -79,6 +86,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
 
     private var statusItemIconCancellable: AnyCancellable?
     private var macControlCancellable: AnyCancellable?
+    private var keyboardLockStateCancellable: AnyCancellable?
+    private var countdownCancellable: AnyCancellable?
+    private weak var keepAwakeMenuItem: NSMenuItem?
     private var keyboardLockOverlay: NSPanel?
     private var dropTargetActive: Bool = false
     private var isKeepAwake: Bool = false
@@ -209,6 +219,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         // Populate synchronously so the first click on the status item is
         // useful. menuNeedsUpdate is nonisolated and refreshes asynchronously.
         rebuildStatusMenu(menu)
+        countdownCancellable = macControl.keepAwake.$currentTime.sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.keepAwakeMenuItem?.title = self.keepAwakeStatusTitle
+            }
+        }
         macControlCancellable = Publishers.CombineLatest(
             macControl.keepAwake.$sessions,
             macControl.keyboardLock.$state
@@ -228,6 +244,17 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
                 }
             }
         }
+        keyboardLockStateCancellable = macControl.keyboardLock.$state
+            .removeDuplicates()
+            .sink { [weak self] state in
+                guard state == .unavailable || state == .permissionRequired else { return }
+                Task { @MainActor [weak self] in
+                    guard let self, self.macControl.keyboardLock.state == state,
+                          self.settingsWindow?.isVisible != true else { return }
+                    if state == .permissionRequired { self.showKeyboardPermissionGuide() }
+                    else { self.showKeyboardUnavailableGuide() }
+                }
+            }
 
         shakeDetector.onShake = { [weak self] in self?.handleShake() }
         shakeDetector.start()
@@ -348,6 +375,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         menu.removeAllItems()
 
         let keepAwake = NSMenuItem(title: keepAwakeStatusTitle, action: nil, keyEquivalent: "")
+        keepAwakeMenuItem = keepAwake
         keepAwake.submenu = buildKeepAwakeMenu()
         menu.addItem(keepAwake)
 
@@ -386,11 +414,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let deadline = session.deadline else {
             return "\(L("Keep Mac Awake")) · \(L("Indefinitely"))"
         }
-        let remaining = max(0, Int(deadline.timeIntervalSince(macControl.keepAwake.currentTime)))
-        let minutes = remaining / 60
-        let hours = minutes / 60
-        let label = hours > 0 ? "\(hours)h \(minutes % 60)m" : "\(max(1, minutes))m"
-        return "\(L("Keep Mac Awake")) · \(label)"
+        let remaining = deadline.timeIntervalSince(macControl.keepAwake.currentTime)
+        return "\(L("Keep Mac Awake")) · \(SessionDurationOptions.clock(remaining))"
     }
 
     @objc private func keepAwakeForAction(_ sender: NSMenuItem) {
@@ -398,7 +423,33 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             endManualKeepAwake()
             return
         }
-        if sender.title == L("Until…") {
+        if sender.title == L("Custom Duration…") {
+            let hours = NSPopUpButton(frame: NSRect(x: 0, y: 0, width: 120, height: 28))
+            hours.addItems(withTitles: (0...48).map { "\($0) \(L("hours"))" })
+            hours.selectItem(at: 1)
+            let minutes = NSPopUpButton(frame: NSRect(x: 130, y: 0, width: 120, height: 28))
+            minutes.addItems(withTitles: (0...59).map { "\($0) \(L("minutes"))" })
+            let view = NSView(frame: NSRect(x: 0, y: 0, width: 250, height: 28))
+            view.addSubview(hours)
+            view.addSubview(minutes)
+            let alert = NSAlert()
+            alert.messageText = L("Custom Duration…")
+            alert.accessoryView = view
+            alert.addButton(withTitle: L("Start"))
+            alert.addButton(withTitle: L("Cancel"))
+            guard alert.runModal() == .alertFirstButtonReturn else { return }
+            let totalMinutes = hours.indexOfSelectedItem * 60 + minutes.indexOfSelectedItem
+            guard totalMinutes > 0 else {
+                let invalid = NSAlert()
+                invalid.messageText = L("Choose a duration greater than zero")
+                invalid.runModal()
+                return
+            }
+            guard macControl.startManualKeepAwake(duration: .minutes(totalMinutes)) else {
+                showKeepAwakeStartFailure()
+                return
+            }
+        } else if sender.title == L("Until…") {
             let picker = NSDatePicker(frame: NSRect(x: 0, y: 0, width: 250, height: 28))
             picker.datePickerStyle = .textFieldAndStepper
             picker.datePickerElements = [.yearMonthDay, .hourMinute]
@@ -434,13 +485,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         submenu.addItem(quickStart)
         submenu.addItem(.separator())
 
-        let options: [(String, KeepAwakeDuration)] = [
-            (L("30 minutes"), .minutes(30)),
-            (L("1 hour"), .minutes(60)),
-            (L("2 hours"), .minutes(120)),
-            (L("Until…"), .indefinite),
-            (L("Indefinitely"), .indefinite),
-        ]
+        let options: [(String, KeepAwakeDuration)] = SessionDurationOptions.minutes.map {
+            (SessionDurationOptions.label(minutes: $0), KeepAwakeDuration.minutes($0))
+        } + [(L("Custom Duration…"), .indefinite), (L("Until…"), .indefinite), (L("Indefinitely"), .indefinite)]
         for (title, duration) in options {
             let item = NSMenuItem(
                 title: title,
@@ -590,21 +637,31 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             macControl.keyboardLock.unlock()
         } else {
             macControl.requestKeyboardLock()
-            if macControl.keyboardLock.state == .permissionRequired {
-                showKeyboardPermissionGuide()
-            }
         }
     }
 
     private func showKeyboardPermissionGuide() {
         let alert = NSAlert()
         alert.messageText = L("Keyboard Lock Permission Required")
-        alert.informativeText = L("macControl.keyboard.permissionGuide")
+        alert.informativeText = L(macControl.keyboardLock.permissionGuideKey)
         alert.alertStyle = .informational
-        alert.addButton(withTitle: L("Open Input Monitoring Settings"))
+        alert.addButton(withTitle: L(macControl.keyboardLock.permissionSettingsTitleKey))
         alert.addButton(withTitle: L("Cancel"))
         if alert.runModal() == .alertFirstButtonReturn {
-            macControl.keyboardLock.openInputMonitoringSettings()
+            macControl.keyboardLock.openKeyboardPermissionSettings()
+        }
+        macControl.keyboardLock.returnToIdle()
+    }
+
+    private func showKeyboardUnavailableGuide() {
+        let alert = NSAlert()
+        alert.messageText = L("Keyboard Lock Unavailable")
+        alert.informativeText = L("macControl.keyboard.unavailable")
+        alert.alertStyle = .warning
+        alert.addButton(withTitle: L(macControl.keyboardLock.permissionSettingsTitleKey))
+        alert.addButton(withTitle: L("OK"))
+        if alert.runModal() == .alertFirstButtonReturn {
+            macControl.keyboardLock.openKeyboardPermissionSettings()
         }
         macControl.keyboardLock.returnToIdle()
     }

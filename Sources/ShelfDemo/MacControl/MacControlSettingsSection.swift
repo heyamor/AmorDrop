@@ -16,7 +16,21 @@ struct MacControlSettingsSection: View {
     @ObservedObject var coordinator: MacControlCoordinator
     @ObservedObject var keepAwake: KeepAwakeSessionManager
     @ObservedObject var closedLid: ClosedLidManager
+    @ObservedObject private var keyboardLock: KeyboardLockManager
+    @ObservedObject private var statistics: SessionStatistics
 
+    init(coordinator: MacControlCoordinator, keepAwake: KeepAwakeSessionManager, closedLid: ClosedLidManager) {
+        self.coordinator = coordinator
+        self.keepAwake = keepAwake
+        self.closedLid = closedLid
+        self.keyboardLock = coordinator.keyboardLock
+        self.statistics = coordinator.statistics
+    }
+
+    @State private var durationMinutes = 60
+    @State private var customHours = 1
+    @State private var customMinutes = 0
+    @State private var confirmClearStatistics = false
     @State private var allowDisplaySleep = true
     @State private var lowBatteryProtection = true
     @State private var lowBatteryThreshold = 20
@@ -41,9 +55,9 @@ struct MacControlSettingsSection: View {
                 }
                 Spacer(minLength: 8)
                 Button(keepAwake.session(for: .manual) == nil
-                       ? L("Start Keep Awake for 1 Hour") : L("End Session")) {
+                       ? L("Start") : L("End Session")) {
                     if keepAwake.session(for: .manual) == nil {
-                        if !coordinator.startManualKeepAwake(duration: .minutes(60)) {
+                        if !coordinator.startManualKeepAwake(duration: selectedDuration) {
                             alert = .keepAwakeFailure
                         }
                     } else {
@@ -51,6 +65,24 @@ struct MacControlSettingsSection: View {
                     }
                 }
                 .controlSize(.small)
+                .disabled(keepAwake.session(for: .manual) == nil && durationMinutes == 0 && customHours == 0 && customMinutes == 0)
+            }
+
+            Picker(L("Duration"), selection: $durationMinutes) {
+                ForEach(SessionDurationOptions.minutes, id: \.self) { value in
+                    Text(SessionDurationOptions.label(minutes: value)).tag(value)
+                }
+                Text(L("Custom Duration…")).tag(0)
+                Text(L("Indefinitely")).tag(-1)
+            }
+            if durationMinutes == 0 {
+                HStack {
+                    Stepper("\(customHours) \(L("hours"))", value: $customHours, in: 0...48)
+                    Stepper("\(customMinutes) \(L("minutes"))", value: $customMinutes, in: 0...59)
+                }
+                if customHours == 0 && customMinutes == 0 {
+                    Text(L("Choose a duration greater than zero")).foregroundStyle(.secondary)
+                }
             }
 
             Group {
@@ -122,6 +154,9 @@ struct MacControlSettingsSection: View {
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
 
+            Divider()
+
+            statisticsSection
             Divider()
 
             Text(L("Closed-Lid Mode"))
@@ -210,15 +245,16 @@ struct MacControlSettingsSection: View {
         }
         .onChange(of: coordinator.keyboardLock.state) { _, newState in
             if newState == .unavailable { alert = .unavailable }
+            if newState == .permissionRequired { alert = .permission }
         }
         .alert(item: $alert) { value in
             switch value {
             case .permission:
                 return Alert(
                     title: Text(L("Keyboard Lock Permission Required")),
-                    message: Text(L("macControl.keyboard.permissionGuide")),
-                    primaryButton: .default(Text(L("Open Input Monitoring Settings"))) {
-                        coordinator.keyboardLock.openInputMonitoringSettings()
+                    message: Text(L(coordinator.keyboardLock.permissionGuideKey)),
+                    primaryButton: .default(Text(L(coordinator.keyboardLock.permissionSettingsTitleKey))) {
+                        coordinator.keyboardLock.openKeyboardPermissionSettings()
                         coordinator.keyboardLock.returnToIdle()
                     },
                     secondaryButton: .cancel(Text(L("Cancel"))) {
@@ -285,11 +321,47 @@ struct MacControlSettingsSection: View {
         guard let deadline = session.deadline else {
             return "\(L("Keep Mac Awake")) · \(L("Indefinitely"))"
         }
-        let seconds = max(0, Int(deadline.timeIntervalSince(keepAwake.currentTime)))
-        let minutes = seconds / 60
-        let hours = minutes / 60
-        let remaining = hours > 0 ? "\(hours)h \(minutes % 60)m" : "\(max(1, minutes))m"
-        return "\(L("Keep Mac Awake")) · \(remaining)"
+        return "\(L("Keep Mac Awake")) · \(SessionDurationOptions.clock(deadline.timeIntervalSince(keepAwake.currentTime)))"
+    }
+
+    private var selectedDuration: KeepAwakeDuration {
+        if durationMinutes == -1 { return .indefinite }
+        return .minutes(durationMinutes == 0 ? customHours * 60 + customMinutes : durationMinutes)
+    }
+
+    private var statisticsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text(L("Session Statistics")).font(.system(size: 12, weight: .medium))
+            Toggle(L("Record sessions on this Mac"), isOn: $statistics.enabled).toggleStyle(.switch)
+            HStack {
+                Text("\(L("Completed sessions")): \(statistics.count)")
+                Spacer()
+                Text("\(L("Total session time")): \(SessionDurationOptions.clock(statistics.seconds))")
+            }
+            Text(L("macControl.statistics.scope"))
+                .font(.system(size: 11)).foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            DisclosureGroup(L("Recent Sessions")) {
+                ForEach(statistics.records.prefix(10)) { record in
+                    HStack {
+                        VStack(alignment: .leading) {
+                            Text(L(record.source))
+                            Text(record.startedAt.formatted(date: .abbreviated, time: .shortened))
+                                .foregroundStyle(.secondary)
+                        }
+                        Spacer()
+                        Text(SessionDurationOptions.clock(record.duration)).monospacedDigit()
+                    }.font(.system(size: 11))
+                }
+                if statistics.records.isEmpty { Text(L("No completed sessions yet")) }
+            }
+            Button(L("Clear Session Statistics…")) { confirmClearStatistics = true }
+                .disabled(statistics.count == 0)
+                .confirmationDialog(L("Clear Session Statistics?"), isPresented: $confirmClearStatistics) {
+                    Button(L("Clear"), role: .destructive) { statistics.clear() }
+                    Button(L("Cancel"), role: .cancel) {}
+                }
+        }
     }
 
     private var closedLidStatus: String {

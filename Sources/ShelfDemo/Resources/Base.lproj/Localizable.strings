@@ -54,8 +54,8 @@
 "Permission Required" = "Permission Required";
 "Unavailable" = "Unavailable";
 "Keyboard Lock Permission Required" = "Keyboard Lock Permission Required";
-"macControl.keyboard.permissionGuide" = "Open System Settings → Privacy & Security → Input Monitoring and allow AmorDrop. Then quit and reopen AmorDrop before trying again.";
-"Open Input Monitoring Settings" = "Open Input Monitoring Settings";
+"macControl.keyboard.permissionGuide" = "Keyboard Lock needs Accessibility permission to block keystrokes. Open System Settings → Privacy & Security → Accessibility (Device Control & Data Access on some systems), add and allow /Applications/AmorDrop.app, then try Lock Keyboard again. Input Monitoring alone cannot block typing.";
+"Open Accessibility Settings" = "Open Accessibility Settings";
 "Cancel" = "Cancel";
 "Keyboard Lock Unavailable" = "Keyboard Lock Unavailable";
 "macControl.keyboard.unavailable" = "macOS did not allow the keyboard event tap to start. Keyboard input has not been blocked.";
@@ -234,3 +234,38 @@
 "Remove Helper" = "Remove Helper";
 "Remove AmorDrop Helper?" = "Remove the AmorDrop Helper?";
 "macControl.closedLid.removeWarning" = "AmorDrop first ends any active session and restores the saved sleep setting, then unregisters its Login Item helper. macOS approval is required. If restoration cannot be verified, the helper refuses removal.";
+
+"Open Input Monitoring Settings" = "Open Input Monitoring Settings";
+"macControl.keyboard.inputPermissionGuide" = "Accessibility is authorized, but macOS is still denying keyboard events. The keyboard is not locked. In System Settings → Privacy & Security → Input Monitoring, remove the old AmorDrop entry, add /Applications/AmorDrop.app, and enable it. Restart the app if macOS requests it, then try again.";
+
+"Duration" = "Duration";
+
+"hours" = "hours";
+
+"minutes" = "minutes";
+
+"Custom Duration…" = "Custom Duration…";
+
+"Choose a duration greater than zero" = "Choose a duration greater than zero";
+
+"Session Statistics" = "Session Statistics";
+
+"Record sessions on this Mac" = "Record sessions on this Mac";
+
+"Completed sessions" = "Completed sessions";
+
+"Total session time" = "Total session time";
+
+"Recent Sessions" = "Recent Sessions";
+
+"No completed sessions yet" = "No completed sessions yet";
+
+"Clear Session Statistics…" = "Clear Session Statistics…";
+
+"Clear Session Statistics?" = "Clear Session Statistics?";
+
+"Manual Keep Awake" = "Manual Keep Awake";
+
+"Power Adapter Trigger" = "Power Adapter Trigger";
+
+"macControl.statistics.scope" = "Records future completed Keep Awake sessions locally, with up to 200 recent records. Concurrent sessions are counted separately. Active sessions and crashes are not included. Nothing is uploaded.";

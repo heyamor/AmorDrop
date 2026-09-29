@@ -21,6 +21,7 @@ enum MacControlPreference {
 @MainActor
 final class MacControlCoordinator: ObservableObject {
     let keepAwake = KeepAwakeSessionManager()
+    let statistics = SessionStatistics()
     let keyboardLock = KeyboardLockManager()
     let closedLid = ClosedLidManager()
 
@@ -36,6 +37,15 @@ final class MacControlCoordinator: ObservableObject {
 
     init(batteryMonitor: BatteryMonitoring? = nil) {
         self.batteryMonitor = batteryMonitor ?? IOKitBatteryMonitor()
+        keepAwake.onSessionEnded = { [weak self] session, end in
+            let source: String
+            switch session.owner {
+            case .manual: source = "Manual Keep Awake"
+            case .powerAdapter: source = "Power Adapter Trigger"
+            case .application(let id): source = "App: " + id
+            }
+            self?.statistics.record(source: source, startedAt: session.startedAt, endedAt: end)
+        }
     }
 
     func start() {

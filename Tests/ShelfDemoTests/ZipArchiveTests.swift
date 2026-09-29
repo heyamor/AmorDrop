@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class ZipArchiveTests: XCTestCase {
     private var root: URL!

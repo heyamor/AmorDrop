@@ -17,7 +17,7 @@ func L(_ key: String, comment: StaticString = "") -> String {
 /// LocalizedStringKey's auto-interpolation.
 
 /// Available UI languages for the override picker. Keep in sync with the
-/// `.lproj` directories under `Sources/ShelfDemo/Resources/`.
+/// `.lproj` directories under the app's source resource directory.
 enum AppLanguage: String, CaseIterable, Identifiable {
     case system  // sentinel — use macOS preferred language
     case english = "en"

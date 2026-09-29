@@ -1,3 +1,4 @@
+import AppKit
 import Combine
 import Foundation
 import IOKit.pwr_mgt
@@ -84,6 +85,10 @@ final class KeepAwakeSessionManager: ObservableObject {
     private let assertions: PowerAssertionControlling
     private let now: () -> Date
     private var expiryTimer: Timer?
+    private var wakeObserver: NSObjectProtocol?
+    var onSessionEnded: ((KeepAwakeSession, Date) -> Void)?
+    var hasScheduledTick: Bool { expiryTimer?.isValid == true }
+
 
     init(
         assertions: PowerAssertionControlling? = nil,
@@ -91,6 +96,12 @@ final class KeepAwakeSessionManager: ObservableObject {
     ) {
         self.assertions = assertions ?? IOKitPowerAssertionController()
         self.now = now
+        currentTime = now()
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification, object: nil, queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.expireDueSessions() }
+        }
     }
 
     var isActive: Bool { !sessions.isEmpty }
@@ -131,6 +142,7 @@ final class KeepAwakeSessionManager: ObservableObject {
     func stop(owner: KeepAwakeOwner) -> Bool {
         guard let session = sessions.removeValue(forKey: owner) else { return false }
         assertions.release(session.assertionID)
+        onSessionEnded?(session, min(now(), session.deadline ?? now()))
         updateExpirationTimer()
         return true
     }
@@ -142,8 +154,15 @@ final class KeepAwakeSessionManager: ObservableObject {
     func updateBehavior(for owner: KeepAwakeOwner, to behavior: KeepAwakeBehavior) -> Bool {
         guard let existing = sessions[owner] else { return false }
         guard existing.behavior != behavior else { return true }
-        let duration = existing.deadline.map(KeepAwakeDuration.until) ?? .indefinite
-        return start(owner: owner, behavior: behavior, duration: duration)
+        guard existing.deadline.map({ $0 > now() }) ?? true else {
+            expireDueSessions()
+            return false
+        }
+        guard let id = assertions.create(type: behavior.assertionType, name: "AmorDrop \(owner.assertionLabel)") else { return false }
+        sessions[owner] = KeepAwakeSession(owner: owner, behavior: behavior,
+            startedAt: existing.startedAt, deadline: existing.deadline, assertionID: id)
+        assertions.release(existing.assertionID)
+        return true
     }
 
     func stopAll() {
@@ -151,7 +170,11 @@ final class KeepAwakeSessionManager: ObservableObject {
         expiryTimer = nil
         let current = sessions.values
         sessions.removeAll()
-        current.forEach { assertions.release($0.assertionID) }
+        current.forEach {
+            assertions.release($0.assertionID)
+            onSessionEnded?($0, min(now(), $0.deadline ?? now()))
+        }
+        currentTime = now()
     }
 
     /// Also called by the repeating timer and exposed internally for
@@ -164,6 +187,7 @@ final class KeepAwakeSessionManager: ObservableObject {
         for owner in expiredOwners {
             _ = stop(owner: owner)
         }
+        updateExpirationTimer()
     }
 
     func remainingTime(for owner: KeepAwakeOwner) -> TimeInterval? {
@@ -174,19 +198,22 @@ final class KeepAwakeSessionManager: ObservableObject {
     private func updateExpirationTimer() {
         expiryTimer?.invalidate()
         expiryTimer = nil
-        let deadline = sessions.values.compactMap(\.deadline).min()
-        expiryTimer = Timer.scheduledTimer(
-            withTimeInterval: max(0.1, min(60, deadline?.timeIntervalSince(now()) ?? 60)),
-            repeats: false
-        ) { [weak self] _ in
-            Task { @MainActor [weak self] in
-                self?.expireDueSessions()
-            }
+        currentTime = now()
+        guard !sessions.isEmpty else { return }
+        // Re-arm every tick, even when nothing has expired. Common modes keep
+        // expiration and countdown alive while an NSMenu tracks the mouse.
+        let nextDeadline = sessions.values.compactMap(\.deadline).min()
+        let interval = max(0.01, min(1, nextDeadline?.timeIntervalSince(currentTime) ?? 1))
+        let timer = Timer(timeInterval: interval, repeats: false) { [weak self] _ in
+            Task { @MainActor [weak self] in self?.expireDueSessions() }
         }
+        expiryTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     isolated deinit {
         expiryTimer?.invalidate()
+        if let wakeObserver { NSWorkspace.shared.notificationCenter.removeObserver(wakeObserver) }
         for session in sessions.values {
             assertions.release(session.assertionID)
         }

@@ -1,7 +1,7 @@
 import AppKit
 import UniformTypeIdentifiers
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class FilePromiseSafetyTests: XCTestCase {
     private var root: URL!

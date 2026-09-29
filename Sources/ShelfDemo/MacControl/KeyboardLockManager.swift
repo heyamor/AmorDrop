@@ -2,6 +2,8 @@ import AppKit
 import Combine
 import CoreGraphics
 import Foundation
+import ApplicationServices
+import IOKit.hid
 
 enum KeyboardLockState: Equatable {
     case idle
@@ -13,7 +15,9 @@ enum KeyboardLockState: Equatable {
 
 @MainActor
 protocol KeyboardLockMonitoring: AnyObject {
-    var hasListenPermission: Bool { get }
+    var hasAccessibilityPermission: Bool { get }
+    var hasInputMonitoringPermission: Bool { get }
+    func requestAccessibilityPermission() -> Bool
     func start(onUnlock: @escaping @MainActor @Sendable () -> Void) -> Bool
     func stop()
 }
@@ -31,9 +35,11 @@ final class KeyboardLockManager: ObservableObject {
 
     func beginLockRequest() {
         guard state == .idle else { return }
-        guard monitor.hasListenPermission else {
-            state = .permissionRequired
-            return
+        if !monitor.hasAccessibilityPermission {
+            guard monitor.requestAccessibilityPermission(), monitor.hasAccessibilityPermission else {
+                state = .permissionRequired
+                return
+            }
         }
         state = .countingDown(3)
         scheduleCountdown()
@@ -50,10 +56,15 @@ final class KeyboardLockManager: ObservableObject {
 
         countdownTimer?.invalidate()
         countdownTimer = nil
+        guard monitor.hasAccessibilityPermission else {
+            state = .permissionRequired
+            return
+        }
         guard monitor.start(onUnlock: { [weak self] in
             self?.unlockFromFailSafe()
         }) else {
-            state = .unavailable
+            monitor.stop()
+            state = monitor.hasAccessibilityPermission && monitor.hasInputMonitoringPermission ? .unavailable : .permissionRequired
             return
         }
         state = .locked
@@ -66,8 +77,27 @@ final class KeyboardLockManager: ObservableObject {
         state = .idle
     }
 
-    func openInputMonitoringSettings() {
-        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_ListenEvent") else { return }
+    private var needsInputMonitoring: Bool {
+        monitor.hasAccessibilityPermission && !monitor.hasInputMonitoringPermission
+    }
+
+    var permissionGuideKey: String {
+        needsInputMonitoring ? "macControl.keyboard.inputPermissionGuide" : "macControl.keyboard.permissionGuide"
+    }
+
+    var permissionSettingsTitleKey: String {
+        needsInputMonitoring ? "Open Input Monitoring Settings" : "Open Accessibility Settings"
+    }
+
+    func openKeyboardPermissionSettings() {
+        let pane: String
+        if needsInputMonitoring {
+            _ = IOHIDRequestAccess(kIOHIDRequestTypeListenEvent)
+            pane = "Privacy_ListenEvent"
+        } else {
+            pane = "Privacy_Accessibility"
+        }
+        guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?\(pane)") else { return }
         NSWorkspace.shared.open(url)
     }
 
@@ -114,22 +144,67 @@ private final class KeyboardTapContext: @unchecked Sendable {
 
 @MainActor
 final class CGKeyboardLockMonitor: KeyboardLockMonitoring {
-    var hasListenPermission: Bool { CGPreflightListenEventAccess() }
+    // A defaultTap suppresses events and requires Accessibility authorization.
+    // Input Monitoring only authorizes passive listenOnly taps.
+    var hasAccessibilityPermission: Bool { AXIsProcessTrusted() }
+    var hasInputMonitoringPermission: Bool { CGPreflightListenEventAccess() }
+
+    static let requiredKeyboardMask =
+        (CGEventMask(1) << CGEventType.keyDown.rawValue)
+        | (CGEventMask(1) << CGEventType.keyUp.rawValue)
+        | (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
+
+    /// Quartz may silently strip unauthorized key events while retaining
+    /// flagsChanged. An enabled port alone is not proof of a keyboard lock.
+    static func isCompleteKeyboardTap(_ info: CGEventTapInformation, processID: pid_t) -> Bool {
+        info.tappingProcess == processID && info.enabled
+            && info.options == .defaultTap && info.tapPoint == .cgSessionEventTap
+            && info.eventsOfInterest & requiredKeyboardMask == requiredKeyboardMask
+    }
+
+    private static func hasCompleteKeyboardTap() -> Bool {
+        var count: UInt32 = 0
+        guard CGGetEventTapList(0, nil, &count) == .success, count > 0 else { return false }
+        var taps = [CGEventTapInformation](repeating: CGEventTapInformation(), count: Int(count))
+        let capacity = count
+        guard CGGetEventTapList(capacity, &taps, &count) == .success else { return false }
+        return taps.prefix(Int(min(count, capacity))).contains {
+            isCompleteKeyboardTap($0, processID: getpid())
+        }
+    }
+
+    func requestAccessibilityPermission() -> Bool {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true] as CFDictionary
+        return AXIsProcessTrustedWithOptions(options)
+    }
+
+    static func permissionDiagnostic() -> String {
+        let authorized = AXIsProcessTrusted()
+        var canCreateFilteringTap = false
+        if authorized, let tap = CGEvent.tapCreate(
+            tap: .cgSessionEventTap, place: .headInsertEventTap, options: .defaultTap,
+            eventsOfInterest: CGEventMask(1) << CGEventType.keyDown.rawValue,
+            callback: { _, _, event, _ in Unmanaged.passUnretained(event) }, userInfo: nil
+        ) {
+            canCreateFilteringTap = CGEvent.tapIsEnabled(tap: tap)
+            CGEvent.tapEnable(tap: tap, enable: false)
+            CFMachPortInvalidate(tap)
+        }
+        return "bundle=\(Bundle.main.bundlePath) accessibility=\(authorized) inputMonitoring=\(CGPreflightListenEventAccess()) filteringTap=\(canCreateFilteringTap)"
+    }
 
     private var eventTap: CFMachPort?
     private var runLoopSource: CFRunLoopSource?
     private var context: KeyboardTapContext?
+    private var healthTimer: Timer?
 
     func start(onUnlock: @escaping @MainActor @Sendable () -> Void) -> Bool {
         stop()
-        guard hasListenPermission else { return false }
+        guard hasAccessibilityPermission else { return false }
 
         let context = KeyboardTapContext(onUnlock: onUnlock)
         context.filter.lockKeyboard()
-        let eventMask =
-            (CGEventMask(1) << CGEventType.keyDown.rawValue)
-            | (CGEventMask(1) << CGEventType.keyUp.rawValue)
-            | (CGEventMask(1) << CGEventType.flagsChanged.rawValue)
+        let eventMask = Self.requiredKeyboardMask
         guard let tap = CGEvent.tapCreate(
             tap: .cgSessionEventTap,
             place: .headInsertEventTap,
@@ -146,15 +221,35 @@ final class CGKeyboardLockMonitor: KeyboardLockMonitoring {
         runLoopSource = source
         CFRunLoopAddSource(CFRunLoopGetMain(), source, .commonModes)
         CGEvent.tapEnable(tap: tap, enable: true)
-        guard CGEvent.tapIsEnabled(tap: tap) else {
+        guard CGEvent.tapIsEnabled(tap: tap), Self.hasCompleteKeyboardTap() else {
+            NSLog("AmorDrop keyboard lock: incomplete event tap; accessibility=%d inputMonitoring=%d",
+                  hasAccessibilityPermission, hasInputMonitoringPermission)
             stop()
             return false
         }
+        let timer = Timer(timeInterval: 0.5, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, let tap = self.eventTap else { return }
+                guard CGEvent.tapIsEnabled(tap: tap), Self.hasCompleteKeyboardTap() else {
+                    let notify = self.context?.onUnlock
+                    self.stop()
+                    notify?()
+                    return
+                }
+            }
+        }
+        healthTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
         return true
     }
 
     func stop() {
-        if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: false) }
+        healthTimer?.invalidate()
+        healthTimer = nil
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
+        }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }
@@ -164,7 +259,11 @@ final class CGKeyboardLockMonitor: KeyboardLockMonitoring {
     }
 
     isolated deinit {
-        if let eventTap { CGEvent.tapEnable(tap: eventTap, enable: false) }
+        healthTimer?.invalidate()
+        if let eventTap {
+            CGEvent.tapEnable(tap: eventTap, enable: false)
+            CFMachPortInvalidate(eventTap)
+        }
         if let runLoopSource {
             CFRunLoopRemoveSource(CFRunLoopGetMain(), runLoopSource, .commonModes)
         }

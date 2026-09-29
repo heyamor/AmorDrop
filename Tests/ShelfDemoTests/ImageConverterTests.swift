@@ -2,7 +2,7 @@ import XCTest
 import AppKit
 import ImageIO
 import UniformTypeIdentifiers
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class ImageConverterTests: XCTestCase {
     var tempDir: URL!

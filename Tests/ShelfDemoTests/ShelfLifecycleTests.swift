@@ -1,5 +1,5 @@
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class ShelfLifecycleTests: XCTestCase {
     func test_multiple_shelves_clear_undo_and_close_preserve_files() async throws {

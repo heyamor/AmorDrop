@@ -1,6 +1,6 @@
 import IOKit.pwr_mgt
 import XCTest
-@testable import ShelfDemo
+@testable import AmorDrop
 
 @MainActor
 private final class FakePowerAssertionController: PowerAssertionControlling {
@@ -141,4 +141,50 @@ final class KeepAwakeSessionTests: XCTestCase {
         XCTAssertFalse(manager.isActive)
         XCTAssertEqual(Set(assertions.released), Set([1, 2]))
     }
+    func test_timer_keeps_ticking_after_first_non_expiring_tick() async throws {
+        let assertions = FakePowerAssertionController()
+        var now = Date(timeIntervalSince1970: 1_000)
+        let manager = KeepAwakeSessionManager(assertions: assertions, now: { now })
+        XCTAssertTrue(manager.start(owner: .manual, behavior: .allowDisplaySleep, duration: .minutes(1)))
+        now.addTimeInterval(10)
+        try await Task.sleep(for: .milliseconds(1300))
+        XCTAssertEqual(manager.currentTime, now)
+        XCTAssertTrue(manager.isActive)
+        XCTAssertTrue(manager.hasScheduledTick)
+        now.addTimeInterval(51)
+        try await Task.sleep(for: .milliseconds(1300))
+        XCTAssertFalse(manager.isActive)
+        XCTAssertEqual(assertions.released, [1])
+        XCTAssertFalse(manager.hasScheduledTick)
+    }
+
+    func test_delayed_expiry_records_deadline_not_late_wakeup_time() {
+        let assertions = FakePowerAssertionController()
+        var now = Date(timeIntervalSince1970: 1_000)
+        let manager = KeepAwakeSessionManager(assertions: assertions, now: { now })
+        var ends: [Date] = []
+        manager.onSessionEnded = { _, end in ends.append(end) }
+        XCTAssertTrue(manager.start(owner: .manual, behavior: .allowDisplaySleep, duration: .minutes(1)))
+        now.addTimeInterval(300)
+        manager.expireDueSessions()
+        manager.expireDueSessions()
+        XCTAssertEqual(ends, [Date(timeIntervalSince1970: 1060)])
+        XCTAssertEqual(assertions.released, [1])
+    }
+
+    func test_behavior_change_preserves_start_and_does_not_split_statistics() {
+        let assertions = FakePowerAssertionController()
+        var now = Date(timeIntervalSince1970: 1_000)
+        let manager = KeepAwakeSessionManager(assertions: assertions, now: { now })
+        var starts: [Date] = []
+        manager.onSessionEnded = { session, _ in starts.append(session.startedAt) }
+        XCTAssertTrue(manager.start(owner: .manual, behavior: .allowDisplaySleep, duration: .minutes(5)))
+        now.addTimeInterval(60)
+        XCTAssertTrue(manager.updateBehavior(for: .manual, to: .keepDisplayAwake))
+        XCTAssertTrue(starts.isEmpty)
+        XCTAssertEqual(manager.session(for: .manual)?.startedAt, Date(timeIntervalSince1970: 1000))
+        manager.stopAll()
+        XCTAssertEqual(starts, [Date(timeIntervalSince1970: 1000)])
+    }
+
 }

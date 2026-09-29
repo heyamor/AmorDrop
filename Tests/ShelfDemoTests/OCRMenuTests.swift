@@ -1,6 +1,6 @@
 import XCTest
 import UniformTypeIdentifiers
-@testable import ShelfDemo
+@testable import AmorDrop
 
 final class OCRMenuTests: XCTestCase {
     func test_makeSearchable_offered_for_pdfs_only() {

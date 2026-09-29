@@ -64,8 +64,8 @@
 "Permission Required" = "需要权限";
 "Unavailable" = "不可用";
 "Keyboard Lock Permission Required" = "键盘锁需要权限";
-"macControl.keyboard.permissionGuide" = "打开“系统设置 → 隐私与安全性 → 输入监控”，允许 AmorDrop。然后退出并重新打开 AmorDrop，再试一次。";
-"Open Input Monitoring Settings" = "打开输入监控设置";
+"macControl.keyboard.permissionGuide" = "键盘锁需要“辅助功能”权限来阻止按键传给其他 App。请打开“系统设置 → 隐私与安全性 → 辅助功能”（部分系统显示为“设备控制与数据访问”），添加并允许 /Applications/AmorDrop.app，然后再次点击锁定键盘。只有输入监控权限无法拦截按键。";
+"Open Accessibility Settings" = "打开辅助功能设置";
 "Cancel" = "取消";
 "Keyboard Lock Unavailable" = "键盘锁不可用";
 "macControl.keyboard.unavailable" = "macOS 未允许启动键盘事件监听，键盘输入没有被拦截。";
@@ -231,3 +231,38 @@
 "Remove Helper" = "移除辅助组件";
 "Remove AmorDrop Helper?" = "要移除 AmorDrop 辅助组件吗？";
 "macControl.closedLid.removeWarning" = "先结束并恢复活动会话，然后从 macOS 登录项中取消注册辅助组件。此操作需要管理员批准；如果原始睡眠设置无法确认恢复，辅助组件会拒绝移除。";
+
+"Open Input Monitoring Settings" = "打开输入监控设置";
+"macControl.keyboard.inputPermissionGuide" = "辅助功能已授权，但系统仍拒绝键盘输入事件，键盘尚未锁定。请在系统设置 → 隐私与安全 → 输入监控中，移除旧 AmorDrop 条目后重新添加 /Applications/AmorDrop.app 并开启。按系统提示重启 App 后重试。";
+
+"Duration" = "保持时长";
+
+"hours" = "小时";
+
+"minutes" = "分钟";
+
+"Custom Duration…" = "自定义时长…";
+
+"Choose a duration greater than zero" = "请选择大于零的时长";
+
+"Session Statistics" = "会话统计";
+
+"Record sessions on this Mac" = "在本机记录会话";
+
+"Completed sessions" = "已结束会话";
+
+"Total session time" = "累计会话时长";
+
+"Recent Sessions" = "最近会话";
+
+"No completed sessions yet" = "暂无已结束的会话";
+
+"Clear Session Statistics…" = "清空会话统计…";
+
+"Clear Session Statistics?" = "清空本机会话统计？";
+
+"Manual Keep Awake" = "手动保持唤醒";
+
+"Power Adapter Trigger" = "接通电源触发";
+
+"macControl.statistics.scope" = "仅记录此后正常结束的保持唤醒会话，最近记录最多保留 200 条。并行会话分别累计，未结束或异常退出的会话不计入；不上传数据。";

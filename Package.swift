@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "ShelfDemo",
+    name: "AmorDrop",
     defaultLocalization: "en",
     platforms: [.macOS("15.6")],
     products: [
-        .executable(name: "ShelfDemo", targets: ["ShelfDemo"]),
+        .executable(name: "AmorDrop", targets: ["AmorDrop"]),
         .executable(name: "AmorDropClosedLidHelper", targets: ["AmorDropClosedLidHelper"]),
         .library(name: "ClosedLidCore", targets: ["ClosedLidCore"]),
     ],
@@ -22,7 +22,7 @@ let package = Package(
             path: "Sources/AmorDropClosedLidHelper"
         ),
         .executableTarget(
-            name: "ShelfDemo",
+            name: "AmorDrop",
             dependencies: ["ClosedLidCore"],
             path: "Sources/ShelfDemo",
             // The .icns is consumed only by the packaged .app bundle (copied
@@ -34,8 +34,8 @@ let package = Package(
             ]
         ),
         .testTarget(
-            name: "ShelfDemoTests",
-            dependencies: ["ShelfDemo", "ClosedLidCore"],
+            name: "AmorDropTests",
+            dependencies: ["AmorDrop", "ClosedLidCore"],
             path: "Tests/ShelfDemoTests"
         ),
     ]
