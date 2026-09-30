@@ -4,8 +4,10 @@
 <dict>
     <key>Label</key>
     <string>com.amor.personal.amordrop.closed-lid</string>
-    <key>BundleProgram</key>
-    <string>Contents/MacOS/AmorDropClosedLidHelper</string>
+    <!-- The supported installation location is /Applications. Using Program
+         avoids stale BTM bundle-path resolution after replacing an ad-hoc app. -->
+    <key>Program</key>
+    <string>/Applications/AmorDrop.app/Contents/MacOS/AmorDropClosedLidHelper</string>
     <key>MachServices</key>
     <dict>
         <key>com.amor.personal.amordrop.closed-lid</key>

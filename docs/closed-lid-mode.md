@@ -78,3 +78,14 @@ Automated timer coverage includes the exact deadline boundary, indefinite mode,
 failed restoration and retry, replacement sessions, invalid durations, legacy
 state decoding, and persisted state recovery after restart. Physical lid-close
 expiry still needs manual verification on the target Mac.
+
+## Installation path fix (1.3.1)
+
+The daemon uses the standard launchd `Program` key pointing to
+`/Applications/AmorDrop.app/Contents/MacOS/AmorDropClosedLidHelper`. Installation
+in `/Applications` is required for Closed-Lid Mode. This avoids the observed
+`copy_bundle_path` / EX_CONFIG failure when macOS BTM retains stale mappings for
+replaced ad-hoc bundles. The service is still registered through SMAppService,
+requires its normal approval, and runs the same embedded helper with recovery
+and battery protection. No separate helper executable or sudoers rule is added.
+App CFBundleVersion now follows the release version instead of remaining at 1.

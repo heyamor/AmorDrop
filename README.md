@@ -4,7 +4,7 @@
 
 适用于 Apple Silicon Mac 的原生文件暂存架，基于 [Dropshit](https://github.com/iamsumanp/Dropshit)。
 
-[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.3.0/AmorDrop-macOS15.6-arm64-preview-1.3.0.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
+[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.3.1/AmorDrop-macOS15.6-arm64-preview-1.3.1.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
 
 ## 功能
 
