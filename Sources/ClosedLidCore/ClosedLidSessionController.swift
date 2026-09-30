@@ -6,19 +6,22 @@ public struct ClosedLidSessionState: Codable, Equatable, Sendable {
     public let lowBatteryProtectionEnabled: Bool
     public let lowBatteryThreshold: Int
     public let startedAt: Date
+    public let endsAt: Date?
 
     public init(
         schemaVersion: Int = 1,
         originalSleepDisabled: Bool,
         lowBatteryProtectionEnabled: Bool,
         lowBatteryThreshold: Int,
-        startedAt: Date = Date()
+        startedAt: Date = Date(),
+        endsAt: Date? = nil
     ) {
         self.schemaVersion = schemaVersion
         self.originalSleepDisabled = originalSleepDisabled
         self.lowBatteryProtectionEnabled = lowBatteryProtectionEnabled
         self.lowBatteryThreshold = min(100, max(0, lowBatteryThreshold))
         self.startedAt = startedAt
+        self.endsAt = endsAt
     }
 }
 
@@ -35,6 +38,7 @@ public protocol ClosedLidStateStoring: AnyObject {
 
 public enum ClosedLidSessionError: Error, Equatable, LocalizedError {
     case alreadyActive
+    case invalidDuration
     case sleepSettingDidNotChange
     case sleepSettingDidNotRestore
 
@@ -42,6 +46,8 @@ public enum ClosedLidSessionError: Error, Equatable, LocalizedError {
         switch self {
         case .alreadyActive:
             "A Closed-Lid session is already recorded. Recovery is required before starting another."
+        case .invalidDuration:
+            "Choose a Closed-Lid session duration from 1 second to 48 hours, or choose indefinite."
         case .sleepSettingDidNotChange:
             "macOS did not confirm the requested sleep setting."
         case .sleepSettingDidNotRestore:
@@ -76,16 +82,23 @@ public final class ClosedLidSessionController {
     @discardableResult
     public func start(
         lowBatteryProtectionEnabled: Bool,
-        lowBatteryThreshold: Int
+        lowBatteryThreshold: Int,
+        durationSeconds: TimeInterval? = nil
     ) throws -> ClosedLidSessionState {
         guard try store.load() == nil else { throw ClosedLidSessionError.alreadyActive }
+        if let durationSeconds,
+           (!durationSeconds.isFinite || durationSeconds < 1 || durationSeconds > 48 * 60 * 60) {
+            throw ClosedLidSessionError.invalidDuration
+        }
 
         let original = try settings.readSleepDisabled()
+        let startedAt = now()
         let state = ClosedLidSessionState(
             originalSleepDisabled: original,
             lowBatteryProtectionEnabled: lowBatteryProtectionEnabled,
             lowBatteryThreshold: lowBatteryThreshold,
-            startedAt: now()
+            startedAt: startedAt,
+            endsAt: durationSeconds.map { startedAt.addingTimeInterval($0) }
         )
 
         // A saved record means recovery must run even if the process exits
@@ -127,6 +140,16 @@ public final class ClosedLidSessionController {
     /// callers must not overwrite it with a new session.
     public func recoverStaleSession() throws {
         try stopAndRestore()
+    }
+
+    public func endIfExpired() throws -> Bool {
+        guard let state = try store.load(),
+              let endsAt = state.endsAt,
+              endsAt <= now() else {
+            return false
+        }
+        try stopAndRestore()
+        return true
     }
 
     public func endForLowBatteryIfNeeded(isOnBattery: Bool?, percent: Int?) throws -> Bool {
@@ -202,8 +225,13 @@ public final class PropertyListClosedLidStateStore: ClosedLidStateStoring {
     func startSession(
         lowBatteryProtectionEnabled: Bool,
         lowBatteryThreshold: Int,
-        reply: @escaping (Bool, String?) -> Void
+        durationSeconds: Int64,
+        reply: @escaping (Bool, Double, String?) -> Void
     )
     func stopSession(reply: @escaping (Bool, String?) -> Void)
+    // Preserve the original selectors and reply ABI for existing app/helper versions.
+    func startSession(lowBatteryProtectionEnabled: Bool, lowBatteryThreshold: Int,
+                      reply: @escaping (Bool, String?) -> Void)
     func getSessionStatus(reply: @escaping (Bool, String?) -> Void)
+    func getTimedSessionStatus(reply: @escaping (Bool, Double, String?) -> Void)
 }

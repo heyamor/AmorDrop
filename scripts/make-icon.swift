@@ -28,73 +28,71 @@ let renditions: [(String, Int)] = [
     ("icon_512x512@2x.png", 1024),
 ]
 
+// Flat A monogram: the counter is a shelf holding a file. Coordinates are
+// normalized to 1000 so every PNG rendition and the PDF use the same paths.
+func drawMark(into ctx: CGContext, rect: CGRect) {
+    ctx.saveGState()
+    ctx.translateBy(x: rect.minX, y: rect.minY)
+    ctx.scaleBy(x: rect.width / 1000, y: rect.height / 1000)
+    let a = CGMutablePath()
+    a.move(to: CGPoint(x: 145, y: 160))
+    a.addCurve(to: CGPoint(x: 113, y: 223), control1: CGPoint(x: 112, y: 160), control2: CGPoint(x: 97, y: 190))
+    a.addLine(to: CGPoint(x: 386, y: 788))
+    a.addCurve(to: CGPoint(x: 481, y: 854), control1: CGPoint(x: 405, y: 832), control2: CGPoint(x: 441, y: 854))
+    a.addLine(to: CGPoint(x: 519, y: 854))
+    a.addCurve(to: CGPoint(x: 614, y: 788), control1: CGPoint(x: 559, y: 854), control2: CGPoint(x: 595, y: 832))
+    a.addLine(to: CGPoint(x: 887, y: 223))
+    a.addCurve(to: CGPoint(x: 855, y: 160), control1: CGPoint(x: 903, y: 190), control2: CGPoint(x: 888, y: 160))
+    a.addLine(to: CGPoint(x: 786, y: 160))
+    a.addCurve(to: CGPoint(x: 722, y: 202), control1: CGPoint(x: 756, y: 160), control2: CGPoint(x: 737, y: 174))
+    a.addLine(to: CGPoint(x: 696, y: 240))
+    a.addCurve(to: CGPoint(x: 644, y: 270), control1: CGPoint(x: 686, y: 260), control2: CGPoint(x: 670, y: 270))
+    a.addLine(to: CGPoint(x: 356, y: 270))
+    a.addCurve(to: CGPoint(x: 304, y: 240), control1: CGPoint(x: 330, y: 270), control2: CGPoint(x: 314, y: 260))
+    a.addLine(to: CGPoint(x: 278, y: 202))
+    a.addCurve(to: CGPoint(x: 214, y: 160), control1: CGPoint(x: 263, y: 174), control2: CGPoint(x: 244, y: 160))
+    a.closeSubpath()
+    // Transparent counter; the bottom edge forms the white shelf.
+    a.move(to: CGPoint(x: 285, y: 350))
+    a.addCurve(to: CGPoint(x: 287, y: 370), control1: CGPoint(x: 276, y: 350), control2: CGPoint(x: 272, y: 364))
+    a.addLine(to: CGPoint(x: 326, y: 370))
+    a.addLine(to: CGPoint(x: 437, y: 590))
+    a.addCurve(to: CGPoint(x: 563, y: 590), control1: CGPoint(x: 465, y: 652), control2: CGPoint(x: 533, y: 652))
+    a.addLine(to: CGPoint(x: 674, y: 370))
+    a.addLine(to: CGPoint(x: 713, y: 370))
+    a.addCurve(to: CGPoint(x: 715, y: 350), control1: CGPoint(x: 728, y: 364), control2: CGPoint(x: 724, y: 350))
+    a.closeSubpath()
+    ctx.setFillColor(CGColor(gray: 0, alpha: 1))
+    ctx.addPath(a)
+    ctx.drawPath(using: .eoFill)
+    let file = CGMutablePath()
+    file.move(to: CGPoint(x: 439, y: 375))
+    file.addLine(to: CGPoint(x: 599, y: 375))
+    file.addLine(to: CGPoint(x: 599, y: 447))
+    file.addQuadCurve(to: CGPoint(x: 591, y: 455), control: CGPoint(x: 599, y: 455))
+    file.addLine(to: CGPoint(x: 569, y: 455))
+    file.addQuadCurve(to: CGPoint(x: 549, y: 475), control: CGPoint(x: 549, y: 455))
+    file.addLine(to: CGPoint(x: 549, y: 527))
+    file.addQuadCurve(to: CGPoint(x: 538, y: 538), control: CGPoint(x: 549, y: 538))
+    file.addLine(to: CGPoint(x: 451, y: 538))
+    file.addQuadCurve(to: CGPoint(x: 439, y: 526), control: CGPoint(x: 439, y: 538))
+    file.closeSubpath()
+    ctx.addPath(file)
+    ctx.fillPath()
+    ctx.restoreGState()
+}
+
 func drawIcon(into ctx: CGContext, pixels: Int) {
     let p = CGFloat(pixels)
-    let rect = CGRect(x: 0, y: 0, width: p, height: p)
-
-    // ── Squircle background (the rounded-rect "tile" macOS icons sit in).
-    // 22% corner radius is the canonical macOS app-icon shape.
-    let cornerRadius = p * 0.22
-    let bg = CGPath(roundedRect: rect, cornerWidth: cornerRadius,
-                    cornerHeight: cornerRadius, transform: nil)
-    ctx.saveGState()
-    ctx.addPath(bg)
-    ctx.clip()
-
-    // Vertical gradient: charcoal at top → near-black at bottom.
-    let colorSpace = CGColorSpaceCreateDeviceRGB()
-    let bgColors = [
-        CGColor(srgbRed: 0.18, green: 0.20, blue: 0.24, alpha: 1.0),
-        CGColor(srgbRed: 0.08, green: 0.09, blue: 0.11, alpha: 1.0),
-    ] as CFArray
-    let bgGradient = CGGradient(colorsSpace: colorSpace, colors: bgColors,
-                                locations: [0, 1])!
-    ctx.drawLinearGradient(
-        bgGradient,
-        start: CGPoint(x: 0, y: p),
-        end: CGPoint(x: 0, y: 0),
-        options: []
-    )
-
-    // Subtle inner highlight at the top — gives a hint of depth without
-    // looking glassy. Kept faint so the icon reads as flat from a distance.
-    let highlightColors = [
-        CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.10),
-        CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.0),
-    ] as CFArray
-    let highlight = CGGradient(colorsSpace: colorSpace, colors: highlightColors,
-                               locations: [0, 1])!
-    ctx.drawLinearGradient(
-        highlight,
-        start: CGPoint(x: 0, y: p),
-        end: CGPoint(x: 0, y: p * 0.55),
-        options: []
-    )
-    ctx.restoreGState()
-
-    // ── Outline + dot motif (echoes the menubar glyph).
-    let glyphInset = p * 0.22
-    let glyphRect = rect.insetBy(dx: glyphInset, dy: glyphInset)
-    let glyphCorner = p * 0.085
-    let strokeWidth = max(p * 0.022, 1.5)
-
-    let glyphPath = CGPath(roundedRect: glyphRect, cornerWidth: glyphCorner,
-                           cornerHeight: glyphCorner, transform: nil)
-    ctx.setStrokeColor(CGColor(srgbRed: 1, green: 1, blue: 1, alpha: 0.92))
-    ctx.setLineWidth(strokeWidth)
-    ctx.addPath(glyphPath)
+    let tile = CGRect(x: p * 0.025, y: p * 0.025, width: p * 0.95, height: p * 0.95)
+    ctx.setFillColor(CGColor(gray: 0.97, alpha: 1))
+    ctx.addPath(CGPath(roundedRect: tile, cornerWidth: p * 0.21, cornerHeight: p * 0.21, transform: nil))
+    ctx.fillPath()
+    ctx.setStrokeColor(CGColor(gray: 0.87, alpha: 1))
+    ctx.setLineWidth(max(0.5, p * 0.001))
+    ctx.addPath(CGPath(roundedRect: tile, cornerWidth: p * 0.21, cornerHeight: p * 0.21, transform: nil))
     ctx.strokePath()
-
-    // Accent dot — sits fully inside the rounded square, top-right.
-    let dotInset = p * 0.045
-    let dotSize = p * 0.105
-    let dotRect = CGRect(
-        x: glyphRect.maxX - dotInset - dotSize,
-        y: glyphRect.maxY - dotInset - dotSize,
-        width: dotSize, height: dotSize
-    )
-    ctx.setFillColor(CGColor(srgbRed: 0.30, green: 0.62, blue: 1.0, alpha: 1.0))
-    ctx.fillEllipse(in: dotRect)
+    drawMark(into: ctx, rect: CGRect(x: p * 0.10, y: p * 0.07, width: p * 0.80, height: p * 0.80))
 }
 
 func writePNG(pixels: Int, to url: URL) {
@@ -123,3 +121,12 @@ for (name, pixels) in renditions {
     writePNG(pixels: pixels, to: outDir.appendingPathComponent(name))
     print("• wrote \(name) (\(pixels)px)")
 }
+
+// A vector template image stays sharp on both Retina and standard displays.
+var mediaBox = CGRect(x: 0, y: 0, width: 18, height: 18)
+let pdfURL = outDir.appendingPathComponent("MenuBarIcon.pdf")
+guard let pdf = CGContext(pdfURL as CFURL, mediaBox: &mediaBox, nil) else { exit(1) }
+pdf.beginPDFPage(nil)
+drawMark(into: pdf, rect: mediaBox)
+pdf.endPDFPage()
+pdf.closePDF()

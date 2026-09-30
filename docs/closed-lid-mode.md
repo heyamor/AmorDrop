@@ -55,3 +55,26 @@ The last closed-lid/lock checks cannot be safely simulated by unit tests. Until
 they pass, use only after manually locking the session and with a power source
 connected. This work has not requested administrator approval or activated the
 helper.
+
+## Timed sessions (1.3.0)
+
+In Settings → Mac Controls → Closed-Lid Mode, choose 30 minutes, one of the
+1–12 hour presets, a custom 1–48 hour duration, or indefinite, then enable the
+session. The menu uses the same saved duration and shows remaining time while
+active. Duration changes apply to the next session; stop an active session first.
+
+The privileged helper persists the deadline with the original sleep setting and
+owns the expiry timer. UI countdown refreshes use the common run-loop modes.
+The helper verifies restoration before reporting an ended session; failed expiry
+restoration retains the recovery record and is retried by its existing monitor.
+Expiry restores the original sleep policy, rather than terminating tasks or
+forcing immediate sleep. Independent Keep Awake requests are not stopped.
+
+The helper must be updated together with the app. Legacy XPC selectors retain
+their original reply types; timed status uses a distinct selector. An older helper
+cannot execute timed requests, so updating only the UI is insufficient.
+
+Automated timer coverage includes the exact deadline boundary, indefinite mode,
+failed restoration and retry, replacement sessions, invalid durations, legacy
+state decoding, and persisted state recovery after restart. Physical lid-close
+expiry still needs manual verification on the target Mac.

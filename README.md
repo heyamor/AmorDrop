@@ -1,8 +1,10 @@
 # AmorDrop
 
+<img src="docs/assets/amordrop-icon.png" width="96" alt="AmorDrop 图标">
+
 适用于 Apple Silicon Mac 的原生文件暂存架，基于 [Dropshit](https://github.com/iamsumanp/Dropshit)。
 
-[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.2.0/AmorDrop-macOS15.6-arm64-preview-1.2.0.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
+[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.3.0/AmorDrop-macOS15.6-arm64-preview-1.3.0.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
 
 ## 功能
 
@@ -10,7 +12,7 @@
 - 多个 Shelf、继续追加、贴边停靠，并支持多项拖出到 Finder 或其他 App
 - Quick Look、创建 ZIP、转换图片格式
 - 菜单栏入口和全局快捷键 `Control-Option-Space`
-- Mac 控制：保持唤醒、电源或 App 触发、低电量保护、键盘清洁锁
+- Mac 控制：保持唤醒、电源或 App 触发、低电量保护、合盖定时运行、键盘清洁锁
 
 ## 安装
 
@@ -30,7 +32,13 @@
 
 从 Finder 放入的文件仍保存在原位置。清空 Shelf 会移除条目及 AmorDrop 自己创建的临时文件，不会删除源文件。应用不提供账号、云上传、遥测或自动更新。
 
-键盘清洁锁需要 macOS 的输入监控权限。合盖保持运行需要单独设置特权辅助组件和管理员授权；该功能仍属实验性能力，可能增加耗电和发热。
+键盘清洁锁需要 macOS 的输入监控权限。合盖保持运行需要单独设置特权辅助组件和管理员授权；可选择 30 分钟、常用小时数、自定义 1–48 小时或无限，到期恢复原睡眠设置。该功能仍属实验性能力，可能增加耗电和发热。
+
+如果更新后合盖组件无法连接，先结束合盖会话并退出 AmorDrop，再运行以下命令刷新组件注册；系统要求的授权需自行确认：
+
+```sh
+open -n -W /Applications/AmorDrop.app --args --repair-closed-lid-helper
+```
 
 ## 从源码构建
 
@@ -38,7 +46,7 @@
 
 ```sh
 bash scripts/build-private-app.sh
-xcrun swift test -c release
+xcrun swift test --build-system native -c release
 ```
 
 ## 许可证

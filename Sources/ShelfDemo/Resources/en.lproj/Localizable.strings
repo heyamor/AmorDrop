@@ -277,3 +277,5 @@
 "Power Adapter Trigger" = "Power Adapter Trigger";
 
 "macControl.statistics.scope" = "Records future completed Keep Awake sessions locally, with up to 200 recent records. Concurrent sessions are counted separately. Active sessions and crashes are not included. Nothing is uploaded.";
+
+"macControl.closedLid.timerNote" = "When the timer ends, the original sleep setting is restored. Running tasks are not terminated. Other Keep Awake sessions remain active.";

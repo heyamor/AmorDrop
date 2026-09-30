@@ -50,6 +50,7 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
     private var clientConnection: NSXPCConnection?
     private var recoveryError: Error?
     private var batteryTimer: DispatchSourceTimer?
+    private var sessionExpiryTimer: DispatchSourceTimer?
 
     init(controller: ClosedLidSessionController, store: ClosedLidStateStoring) {
         self.controller = controller
@@ -74,6 +75,7 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
                     guard self.clientConnection === connection else { return }
                     self.clientConnection = nil
                     self.stopBatteryMonitor()
+                    self.stopSessionExpiryMonitor()
                     do {
                         try self.controller.stopAndRestore()
                         NSLog("AmorDrop Closed-Lid helper: session ended after app disconnected")
@@ -86,6 +88,8 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
                 guard let self, let connection else { return }
                 self.stateQueue.async {
                     guard self.clientConnection === connection else { return }
+                    self.stopBatteryMonitor()
+                    self.stopSessionExpiryMonitor()
                     do {
                         try self.controller.stopAndRestore()
                     } catch {
@@ -100,24 +104,43 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
     func startSession(
         lowBatteryProtectionEnabled: Bool,
         lowBatteryThreshold: Int,
-        reply: @escaping (Bool, String?) -> Void
+        durationSeconds: Int64,
+        reply: @escaping (Bool, Double, String?) -> Void
     ) {
         stateQueue.async {
             guard self.recoveryError == nil else {
-                reply(false, self.recoveryError?.localizedDescription ?? "Recovery is required")
+                reply(false, 0, self.recoveryError?.localizedDescription ?? "Recovery is required")
                 return
             }
             do {
                 _ = try self.controller.start(
                     lowBatteryProtectionEnabled: lowBatteryProtectionEnabled,
-                    lowBatteryThreshold: lowBatteryThreshold
+                    lowBatteryThreshold: lowBatteryThreshold,
+                    durationSeconds: durationSeconds == 0 ? nil : TimeInterval(durationSeconds)
                 )
                 self.startBatteryMonitor()
-                reply(true, nil)
+                self.startSessionExpiryMonitor()
+                guard let state = try self.store.load() else {
+                    reply(false, 0, "Closed-Lid Mode ended immediately because battery protection was triggered.")
+                    return
+                }
+                reply(true, state.endsAt?.timeIntervalSince1970 ?? 0, nil)
             } catch {
-                reply(false, error.localizedDescription)
+                reply(false, 0, error.localizedDescription)
             }
         }
+    }
+
+    func startSession(lowBatteryProtectionEnabled: Bool, lowBatteryThreshold: Int,
+                      reply: @escaping (Bool, String?) -> Void) {
+        startSession(lowBatteryProtectionEnabled: lowBatteryProtectionEnabled,
+                     lowBatteryThreshold: lowBatteryThreshold, durationSeconds: 0) {
+            success, _, message in reply(success, message)
+        }
+    }
+
+    func getSessionStatus(reply: @escaping (Bool, String?) -> Void) {
+        getTimedSessionStatus { active, _, message in reply(active, message) }
     }
 
     func stopSession(reply: @escaping (Bool, String?) -> Void) {
@@ -125,6 +148,7 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
             do {
                 try self.controller.stopAndRestore()
                 self.stopBatteryMonitor()
+                self.stopSessionExpiryMonitor()
                 reply(true, nil)
             } catch {
                 reply(false, error.localizedDescription)
@@ -132,12 +156,13 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
         }
     }
 
-    func getSessionStatus(reply: @escaping (Bool, String?) -> Void) {
+    func getTimedSessionStatus(reply: @escaping (Bool, Double, String?) -> Void) {
         stateQueue.async {
             do {
-                reply(try self.store.load() != nil, nil)
+                let state = try self.store.load()
+                reply(state != nil, state?.endsAt?.timeIntervalSince1970 ?? 0, nil)
             } catch {
-                reply(false, error.localizedDescription)
+                reply(false, 0, error.localizedDescription)
             }
         }
     }
@@ -157,7 +182,53 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
         batteryTimer = nil
     }
 
+    private func startSessionExpiryMonitor() {
+        guard sessionExpiryTimer == nil else { return }
+        let endsAt: Date
+        do {
+            guard let state = try store.load(), let deadline = state.endsAt else { return }
+            endsAt = deadline
+        } catch {
+            NSLog("AmorDrop Closed-Lid helper: cannot read deadline: %@", error.localizedDescription)
+            return
+        }
+        let timer = DispatchSource.makeTimerSource(queue: stateQueue)
+        // One deadline wake-up; the existing battery monitor also checks expiry
+        // after wake/clock changes and retries a failed restoration.
+        timer.schedule(deadline: .now() + max(0, endsAt.timeIntervalSinceNow))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            do {
+                if try self.controller.endIfExpired() {
+                    NSLog("AmorDrop Closed-Lid helper: session ended at its scheduled time")
+                    self.stopSessionExpiryMonitor()
+                    self.stopBatteryMonitor()
+                }
+            } catch {
+                NSLog("AmorDrop Closed-Lid helper: scheduled session restore failed: %@", error.localizedDescription)
+            }
+        }
+        sessionExpiryTimer = timer
+        timer.resume()
+    }
+
+    private func stopSessionExpiryMonitor() {
+        sessionExpiryTimer?.cancel()
+        sessionExpiryTimer = nil
+    }
+
     private func checkBattery() {
+        do {
+            if try controller.endIfExpired() {
+                NSLog("AmorDrop Closed-Lid helper: session ended at its scheduled time")
+                stopSessionExpiryMonitor()
+                stopBatteryMonitor()
+                return
+            }
+        } catch {
+            NSLog("AmorDrop Closed-Lid helper: scheduled session restore failed: %@", error.localizedDescription)
+            return
+        }
         let battery = readBattery()
         do {
             if try controller.endForLowBatteryIfNeeded(
@@ -166,6 +237,7 @@ private final class HelperEndpoint: NSObject, ClosedLidHelperXPCProtocol {
             ) {
                 NSLog("AmorDrop Closed-Lid helper: session ended at low battery")
                 stopBatteryMonitor()
+                stopSessionExpiryMonitor()
             }
         } catch {
             NSLog("AmorDrop Closed-Lid helper: low-battery recovery failed: %@", error.localizedDescription)

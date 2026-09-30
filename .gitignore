@@ -8,3 +8,6 @@ xcuserdata/
 .swiftpm/
 Packages/
 scripts/.sparkle-public-key
+
+# Preserved migration fragments are not source assets.
+.BC.T_*

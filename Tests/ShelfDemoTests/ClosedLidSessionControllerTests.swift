@@ -166,4 +166,109 @@ final class ClosedLidSessionControllerTests: XCTestCase {
         XCTAssertEqual(store.state, original)
         XCTAssertFalse(settings.value)
     }
+    func test_timed_session_restores_at_deadline_only() throws {
+        var now = Date(timeIntervalSince1970: 1000)
+        let settings = FakeSleepSettingController()
+        let store = FakeClosedLidStateStore()
+        let controller = ClosedLidSessionController(settings: settings, store: store, now: { now })
+        let state = try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20, durationSeconds: 60)
+        XCTAssertEqual(state.endsAt, now.addingTimeInterval(60))
+        now.addTimeInterval(59)
+        XCTAssertFalse(try controller.endIfExpired())
+        XCTAssertTrue(settings.value)
+        now.addTimeInterval(1)
+        XCTAssertTrue(try controller.endIfExpired())
+        XCTAssertFalse(settings.value)
+        XCTAssertNil(store.state)
+        XCTAssertFalse(try controller.endIfExpired())
+    }
+
+    func test_indefinite_session_does_not_expire() throws {
+        var now = Date()
+        let settings = FakeSleepSettingController()
+        let store = FakeClosedLidStateStore()
+        let controller = ClosedLidSessionController(settings: settings, store: store, now: { now })
+        let state = try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20)
+        XCTAssertNil(state.endsAt)
+        now.addTimeInterval(7 * 24 * 3600)
+        XCTAssertFalse(try controller.endIfExpired())
+        XCTAssertTrue(settings.value)
+    }
+
+    func test_expiry_failed_restore_retains_record_and_retries() throws {
+        var now = Date()
+        let settings = FakeSleepSettingController()
+        let store = FakeClosedLidStateStore()
+        let controller = ClosedLidSessionController(settings: settings, store: store, now: { now })
+        let state = try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20, durationSeconds: 1)
+        now.addTimeInterval(2)
+        settings.nextSetFails = true
+        XCTAssertThrowsError(try controller.endIfExpired())
+        XCTAssertEqual(store.state, state)
+        XCTAssertTrue(settings.value)
+        XCTAssertTrue(try controller.endIfExpired())
+        XCTAssertFalse(settings.value)
+        XCTAssertNil(store.state)
+    }
+
+    func test_old_deadline_does_not_end_replacement_session() throws {
+        var now = Date()
+        let settings = FakeSleepSettingController()
+        let store = FakeClosedLidStateStore()
+        let controller = ClosedLidSessionController(settings: settings, store: store, now: { now })
+        try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20, durationSeconds: 60)
+        try controller.stopAndRestore()
+        try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20, durationSeconds: 120)
+        now.addTimeInterval(60)
+        XCTAssertFalse(try controller.endIfExpired())
+        XCTAssertTrue(settings.value)
+        now.addTimeInterval(60)
+        XCTAssertTrue(try controller.endIfExpired())
+    }
+
+    func test_invalid_durations_never_change_sleep_setting() {
+        for duration in [0.0, -1, 0.5, .nan, .infinity, 48 * 3600 + 1] {
+            let settings = FakeSleepSettingController()
+            let store = FakeClosedLidStateStore()
+            let controller = ClosedLidSessionController(settings: settings, store: store)
+            XCTAssertThrowsError(try controller.start(lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20, durationSeconds: duration)) {
+                XCTAssertEqual($0 as? ClosedLidSessionError, .invalidDuration)
+            }
+            XCTAssertFalse(settings.value)
+            XCTAssertNil(store.state)
+        }
+    }
+
+    func test_legacy_state_without_deadline_can_be_decoded_and_restored() throws {
+        let data = try PropertyListSerialization.data(fromPropertyList: [
+            "schemaVersion": 1, "originalSleepDisabled": false,
+            "lowBatteryProtectionEnabled": true, "lowBatteryThreshold": 20,
+            "startedAt": Date()
+        ], format: .xml, options: 0)
+        let store = FakeClosedLidStateStore()
+        store.state = try PropertyListDecoder().decode(ClosedLidSessionState.self, from: data)
+        XCTAssertNil(store.state?.endsAt)
+        let settings = FakeSleepSettingController(value: true)
+        let controller = ClosedLidSessionController(settings: settings, store: store)
+        try controller.recoverStaleSession()
+        XCTAssertFalse(settings.value)
+        XCTAssertNil(store.state)
+    }
+
+    func test_timed_state_roundtrip_and_restart_restore_before_deadline() throws {
+        let now = Date()
+        let settings = FakeSleepSettingController(value: true)
+        let store = FakeClosedLidStateStore()
+        let state = ClosedLidSessionState(originalSleepDisabled: false,
+            lowBatteryProtectionEnabled: true, lowBatteryThreshold: 20,
+            startedAt: now, endsAt: now.addingTimeInterval(3600))
+        store.state = try PropertyListDecoder().decode(ClosedLidSessionState.self,
+            from: PropertyListEncoder().encode(state))
+        XCTAssertEqual(store.state, state)
+        let controller = ClosedLidSessionController(settings: settings, store: store, now: { now })
+        try controller.recoverStaleSession()
+        XCTAssertFalse(settings.value)
+        XCTAssertNil(store.state)
+    }
+
 }

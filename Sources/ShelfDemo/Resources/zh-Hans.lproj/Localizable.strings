@@ -266,3 +266,5 @@
 "Power Adapter Trigger" = "接通电源触发";
 
 "macControl.statistics.scope" = "仅记录此后正常结束的保持唤醒会话，最近记录最多保留 200 条。并行会话分别累计，未结束或异常退出的会话不计入；不上传数据。";
+
+"macControl.closedLid.timerNote" = "到期后恢复原来的睡眠设置，不会结束正在运行的任务。其他保持唤醒会话会继续生效。";

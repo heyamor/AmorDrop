@@ -1,6 +1,7 @@
 import AppKit
 import Combine
 import SwiftUI
+import ServiceManagement
 
 @main
 struct AmorDropApp {
@@ -13,6 +14,32 @@ struct AmorDropApp {
         // No prompt, event capture, keyboard suppression, or Mac Control session.
         if CommandLine.arguments.contains("--keyboard-permission-diagnostic") {
             print(CGKeyboardLockMonitor.permissionDiagnostic())
+            return
+        }
+
+        // Explicit maintenance action for an installed app after a bundle update.
+        // Never unregister while a power recovery record still needs restoration.
+        if CommandLine.arguments.contains("--repair-closed-lid-helper") {
+            guard !FileManager.default.fileExists(atPath: "/var/db/com.amor.personal.amordrop.closed-lid-state.plist") else {
+                print("End the active Closed-Lid session before repairing its helper.")
+                exit(1)
+            }
+            Task { @MainActor in
+                do {
+                    let service = SMAppService.daemon(plistName: ClosedLidManager.launchDaemonPlistName)
+                    try await service.unregister()
+                    try service.register()
+                    print("Closed-Lid helper registration status: \(service.status.rawValue)")
+                    if service.status == .requiresApproval {
+                        SMAppService.openSystemSettingsLoginItems()
+                    }
+                    exit(service.status == .enabled ? 0 : 2)
+                } catch {
+                    print("Closed-Lid helper repair failed: \(error.localizedDescription)")
+                    exit(1)
+                }
+            }
+            NSApplication.shared.run()
             return
         }
 
@@ -89,6 +116,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     private var keyboardLockStateCancellable: AnyCancellable?
     private var countdownCancellable: AnyCancellable?
     private weak var keepAwakeMenuItem: NSMenuItem?
+    private weak var closedLidMenuItem: NSMenuItem?
+    private var closedLidCountdownCancellable: AnyCancellable?
     private var keyboardLockOverlay: NSPanel?
     private var dropTargetActive: Bool = false
     private var isKeepAwake: Bool = false
@@ -115,42 +144,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         guard let button = statusItem?.button else { return }
         let isDropping = dropTargetActive
         let isAwake = isKeepAwake
-        // Custom-drawn glyph: rounded-square outline with the dot fully
-        // inside the frame at the top-right (the SF `app.badge` symbol
-        // parks the dot at the corner so it pokes out of the outline).
-        // When keep-awake is on, the body fills solid and the corner dot
-        // becomes a knockout so the icon clearly reads as "active".
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-            let bodyRect = rect.insetBy(dx: 1.75, dy: 1.75)
-            let body = NSBezierPath(roundedRect: bodyRect, xRadius: 4, yRadius: 4)
-            if isAwake {
+            guard let url = Bundle.module.url(forResource: "MenuBarIcon", withExtension: "pdf"),
+                  let mark = NSImage(contentsOf: url) else { return false }
+            mark.draw(in: rect)
+            // Preserve the existing awake/drop state feedback beside the mark.
+            if isAwake || isDropping {
+                let badge = NSBezierPath(ovalIn: NSRect(x: 14.5, y: 14.5, width: 3, height: 3))
                 NSColor.black.setFill()
-                body.fill()
-            } else {
-                body.lineWidth = 1.6
-                NSColor.black.setStroke()
-                body.stroke()
-            }
-
-            // Slightly larger dot when a drop is active for visual emphasis.
-            let dotSize: CGFloat = isDropping ? 5 : 4
-            let inset: CGFloat = 3.5
-            let dotRect = NSRect(
-                x: rect.maxX - inset - dotSize,
-                y: rect.maxY - inset - dotSize,
-                width: dotSize,
-                height: dotSize
-            )
-            let dotPath = NSBezierPath(ovalIn: dotRect)
-            if isAwake {
-                // Punch the corner dot out of the filled body so the awake
-                // state still has a recognizable top-right pip silhouette.
-                NSGraphicsContext.current?.compositingOperation = .clear
-                dotPath.fill()
-                NSGraphicsContext.current?.compositingOperation = .sourceOver
-            } else {
-                NSColor.black.setFill()
-                dotPath.fill()
+                if isDropping { badge.fill() }
+                else { badge.lineWidth = 1; NSColor.black.setStroke(); badge.stroke() }
             }
             return true
         }
@@ -223,6 +226,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.keepAwakeMenuItem?.title = self.keepAwakeStatusTitle
+            }
+        }
+        closedLidCountdownCancellable = macControl.closedLid.$currentTime.sink { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.closedLidMenuItem?.title = self.closedLidMenuTitle
             }
         }
         macControlCancellable = Publishers.CombineLatest(
@@ -535,6 +544,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
             action: #selector(showClosedLidSetup),
             keyEquivalent: ""
         )
+        closedLidMenuItem = closedLid
         closedLid.target = self
         submenu.addItem(closedLid)
         let keyboard = NSMenuItem(title: keyboardLockMenuTitle, action: #selector(requestKeyboardLock), keyEquivalent: "")
@@ -570,7 +580,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     }
 
     private var closedLidMenuTitle: String {
-        if macControl.closedLid.sessionActive { return L("End Closed-Lid Mode") }
+        if macControl.closedLid.sessionActive {
+            let title = L("End Closed-Lid Mode")
+            guard let endsAt = macControl.closedLid.sessionEndsAt else { return title }
+            return "\(title) · \(SessionDurationOptions.clock(endsAt.timeIntervalSince(macControl.closedLid.currentTime)))"
+        }
         if macControl.closedLid.isAuthorized { return L("Start Closed-Lid Mode…") }
         return L("Set up Closed-Lid Mode…")
     }
@@ -602,20 +616,36 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
         }
 
         let alert = NSAlert()
+        let defaults = UserDefaults.standard
+        let durationMinutes = defaults.object(forKey: MacControlPreference.closedLidDurationMinutes) as? Int ?? -1
+        let customHours = min(48, max(1, defaults.object(forKey: MacControlPreference.closedLidCustomHours) as? Int ?? 2))
+        let durationSeconds: Int64
+        let durationLabel: String
+        if durationMinutes == -1 {
+            durationSeconds = 0
+            durationLabel = L("Indefinitely")
+        } else if durationMinutes == 0 {
+            durationSeconds = Int64(customHours * 60 * 60)
+            durationLabel = "\(customHours) \(L("hours"))"
+        } else {
+            durationSeconds = Int64(durationMinutes * 60)
+            durationLabel = SessionDurationOptions.label(minutes: durationMinutes)
+        }
+
         alert.messageText = L("Start Closed-Lid Mode?")
-        alert.informativeText = L("macControl.closedLid.sessionWarning")
+        alert.informativeText = "\(L("macControl.closedLid.sessionWarning"))\n\n\(L("Duration")): \(durationLabel)"
         alert.alertStyle = .warning
         alert.addButton(withTitle: L("Start Closed-Lid Mode"))
         alert.addButton(withTitle: L("Cancel"))
         guard alert.runModal() == .alertFirstButtonReturn else { return }
-        let defaults = UserDefaults.standard
         let batteryProtection = defaults.object(forKey: MacControlPreference.lowBatteryProtection) as? Bool ?? true
         let threshold = defaults.object(forKey: MacControlPreference.lowBatteryThreshold) as? Int ?? 20
         Task { @MainActor in
             do {
                 try await closedLid.startSession(
                     lowBatteryProtectionEnabled: batteryProtection,
-                    threshold: threshold
+                    threshold: threshold,
+                    durationSeconds: durationSeconds
                 )
             } catch {
                 showClosedLidError(error.localizedDescription)

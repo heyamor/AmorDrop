@@ -7,10 +7,15 @@ import ServiceManagement
 final class ClosedLidManager: ObservableObject {
     @Published private(set) var registrationStatus: SMAppService.Status
     @Published private(set) var sessionActive = false
+    @Published private(set) var sessionEndsAt: Date?
+    @Published private(set) var currentTime = Date()
     @Published private(set) var lastError: String?
 
     private let service: SMAppService
     private var connection: NSXPCConnection?
+    private var countdownTimer: Timer?
+    private var refreshingStatus = false
+    private var lastStatusRead = Date.distantPast
 
     convenience init() {
         self.init(service: SMAppService.daemon(plistName: "com.amor.personal.amordrop.closed-lid.plist"))
@@ -29,14 +34,19 @@ final class ClosedLidManager: ObservableObject {
     func refreshStatus() {
         registrationStatus = service.status
         guard isAuthorized else {
-            sessionActive = false
+            setSessionStatus(active: false, endsAt: nil)
             connection?.invalidate()
             connection = nil
             return
         }
+        guard !refreshingStatus else { return }
+        refreshingStatus = true
         Task {
+            defer { refreshingStatus = false }
             do {
-                sessionActive = try await readSessionStatus()
+                let status = try await readSessionStatus()
+                lastStatusRead = Date()
+                setSessionStatus(active: status.active, endsAt: status.endsAt)
                 lastError = nil
             } catch {
                 lastError = error.localizedDescription
@@ -76,7 +86,11 @@ final class ClosedLidManager: ObservableObject {
         SMAppService.openSystemSettingsLoginItems()
     }
 
-    func startSession(lowBatteryProtectionEnabled: Bool, threshold: Int) async throws {
+    func startSession(
+        lowBatteryProtectionEnabled: Bool,
+        threshold: Int,
+        durationSeconds: Int64 = 0
+    ) async throws {
         guard isAuthorized else { throw ClosedLidManagerError.authorizationRequired }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             do {
@@ -85,11 +99,15 @@ final class ClosedLidManager: ObservableObject {
                 })
                 proxy.startSession(
                     lowBatteryProtectionEnabled: lowBatteryProtectionEnabled,
-                    lowBatteryThreshold: threshold
-                ) { success, message in
+                    lowBatteryThreshold: threshold,
+                    durationSeconds: durationSeconds
+                ) { success, endsAtTimestamp, message in
                     Task { @MainActor in
                         if success {
-                            self.sessionActive = true
+                            self.setSessionStatus(
+                                active: true,
+                                endsAt: endsAtTimestamp > 0 ? Date(timeIntervalSince1970: endsAtTimestamp) : nil
+                            )
                             self.lastError = nil
                             continuation.resume()
                         } else {
@@ -106,10 +124,6 @@ final class ClosedLidManager: ObservableObject {
     }
 
     func stopSession() async throws {
-        guard connection != nil else {
-            sessionActive = false
-            return
-        }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             do {
                 let proxy = try remoteProxy(onFailure: { error in
@@ -118,7 +132,7 @@ final class ClosedLidManager: ObservableObject {
                 proxy.stopSession { success, message in
                     Task { @MainActor in
                         if success {
-                            self.sessionActive = false
+                            self.setSessionStatus(active: false, endsAt: nil)
                             self.lastError = nil
                             continuation.resume()
                         } else {
@@ -136,23 +150,29 @@ final class ClosedLidManager: ObservableObject {
 
     func shutdown() {
         // The daemon restores the saved system value on XPC invalidation.
+        countdownTimer?.invalidate()
+        countdownTimer = nil
         connection?.invalidate()
         connection = nil
         sessionActive = false
+        sessionEndsAt = nil
     }
 
-    private func readSessionStatus() async throws -> Bool {
-        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Bool, Error>) in
+    private func readSessionStatus() async throws -> (active: Bool, endsAt: Date?) {
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<(active: Bool, endsAt: Date?), Error>) in
             do {
                 let proxy = try remoteProxy(onFailure: { error in
                     continuation.resume(throwing: error)
                 })
-                proxy.getSessionStatus { active, message in
+                proxy.getTimedSessionStatus { active, endsAtTimestamp, message in
                     Task { @MainActor in
                         if let message {
                             continuation.resume(throwing: ClosedLidManagerError.helper(message))
                         } else {
-                            continuation.resume(returning: active)
+                            continuation.resume(returning: (
+                                active,
+                                endsAtTimestamp > 0 ? Date(timeIntervalSince1970: endsAtTimestamp) : nil
+                            ))
                         }
                     }
                 }
@@ -160,6 +180,27 @@ final class ClosedLidManager: ObservableObject {
                 continuation.resume(throwing: error)
             }
         }
+    }
+
+    private func setSessionStatus(active: Bool, endsAt: Date?) {
+        sessionActive = active
+        sessionEndsAt = active ? endsAt : nil
+        currentTime = Date()
+        countdownTimer?.invalidate()
+        countdownTimer = nil
+        guard active else { return }
+        let timer = Timer(timeInterval: 1, repeats: true) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self else { return }
+                self.currentTime = Date()
+                // Only the helper can confirm that the power setting was restored.
+                if self.currentTime.timeIntervalSince(self.lastStatusRead) >= 5 {
+                    self.refreshStatus()
+                }
+            }
+        }
+        countdownTimer = timer
+        RunLoop.main.add(timer, forMode: .common)
     }
 
     private func remoteProxy(onFailure: @escaping (Error) -> Void) throws -> ClosedLidHelperXPCProtocol {
@@ -171,12 +212,12 @@ final class ClosedLidManager: ObservableObject {
             connection.remoteObjectInterface = NSXPCInterface(with: ClosedLidHelperXPCProtocol.self)
             connection.interruptionHandler = { [weak self] in
                 Task { @MainActor [weak self] in
-                    self?.sessionActive = false
+                    self?.setSessionStatus(active: false, endsAt: nil)
                 }
             }
             connection.invalidationHandler = { [weak self] in
                 Task { @MainActor [weak self] in
-                    self?.sessionActive = false
+                    self?.setSessionStatus(active: false, endsAt: nil)
                     self?.connection = nil
                 }
             }

@@ -12,6 +12,8 @@ enum MacControlPreference {
     static let lowBatteryThreshold = "macControl.lowBatteryThreshold"
     static let powerAdapterTrigger = "macControl.powerAdapterTrigger"
     static let selectedAppBundleIdentifiers = "macControl.selectedAppBundleIdentifiers"
+    static let closedLidDurationMinutes = "macControl.closedLidDurationMinutes"
+    static let closedLidCustomHours = "macControl.closedLidCustomHours"
 
     static func publishChanges() {
         NotificationCenter.default.post(name: .macControlPreferencesDidChange, object: nil)

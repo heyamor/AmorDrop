@@ -36,6 +36,8 @@ struct MacControlSettingsSection: View {
     @State private var lowBatteryThreshold = 20
     @State private var powerAdapterTrigger = false
     @State private var selectedAppBundleIdentifiers = Set<String>()
+    @State private var closedLidDurationMinutes = -1
+    @State private var closedLidCustomHours = 2
     @State private var runningApps: [RunningAppChoice] = []
     @State private var alert: MacControlAlert?
 
@@ -161,6 +163,18 @@ struct MacControlSettingsSection: View {
 
             Text(L("Closed-Lid Mode"))
                 .font(.system(size: 12, weight: .medium))
+            Picker(L("Duration"), selection: $closedLidDurationMinutes) {
+                ForEach(SessionDurationOptions.minutes, id: \.self) { value in
+                    Text(SessionDurationOptions.label(minutes: value)).tag(value)
+                }
+                Text(L("Custom Duration…")).tag(0)
+                Text(L("Indefinitely")).tag(-1)
+            }
+            .disabled(closedLid.sessionActive)
+            if closedLidDurationMinutes == 0 {
+                Stepper("\(closedLidCustomHours) \(L("hours"))", value: $closedLidCustomHours, in: 1...48)
+                    .disabled(closedLid.sessionActive)
+            }
             Toggle(L("Allow Mac to keep running with lid closed"), isOn: Binding(
                 get: { closedLid.sessionActive },
                 set: { enabled in
@@ -173,7 +187,8 @@ struct MacControlSettingsSection: View {
                             if enabled {
                                 try await closedLid.startSession(
                                     lowBatteryProtectionEnabled: lowBatteryProtection,
-                                    threshold: lowBatteryThreshold
+                                    threshold: lowBatteryThreshold,
+                                    durationSeconds: selectedClosedLidDurationSeconds
                                 )
                             } else {
                                 try await closedLid.stopSession()
@@ -187,6 +202,10 @@ struct MacControlSettingsSection: View {
             .toggleStyle(.switch)
             .disabled(!closedLid.isAuthorized)
             Text(closedLidStatus)
+                .font(.system(size: 11))
+                .foregroundStyle(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+            Text(L("macControl.closedLid.timerNote"))
                 .font(.system(size: 11))
                 .foregroundStyle(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -242,6 +261,12 @@ struct MacControlSettingsSection: View {
         .onAppear {
             loadPreferences()
             closedLid.refreshStatus()
+        }
+        .onChange(of: closedLidDurationMinutes) { _, newValue in
+            UserDefaults.standard.set(newValue, forKey: MacControlPreference.closedLidDurationMinutes)
+        }
+        .onChange(of: closedLidCustomHours) { _, newValue in
+            UserDefaults.standard.set(newValue, forKey: MacControlPreference.closedLidCustomHours)
         }
         .onChange(of: coordinator.keyboardLock.state) { _, newState in
             if newState == .unavailable { alert = .unavailable }
@@ -329,6 +354,12 @@ struct MacControlSettingsSection: View {
         return .minutes(durationMinutes == 0 ? customHours * 60 + customMinutes : durationMinutes)
     }
 
+    private var selectedClosedLidDurationSeconds: Int64 {
+        if closedLidDurationMinutes == -1 { return 0 }
+        if closedLidDurationMinutes == 0 { return Int64(closedLidCustomHours * 60 * 60) }
+        return Int64(closedLidDurationMinutes * 60)
+    }
+
     private var statisticsSection: some View {
         VStack(alignment: .leading, spacing: 8) {
             Text(L("Session Statistics")).font(.system(size: 12, weight: .medium))
@@ -365,7 +396,11 @@ struct MacControlSettingsSection: View {
     }
 
     private var closedLidStatus: String {
-        if closedLid.sessionActive { return L("macControl.closedLid.active") }
+        if closedLid.sessionActive {
+            let active = L("macControl.closedLid.active")
+            guard let endsAt = closedLid.sessionEndsAt else { return active }
+            return "\(active) · \(SessionDurationOptions.clock(endsAt.timeIntervalSince(closedLid.currentTime)))"
+        }
         switch closedLid.registrationStatus {
         case .enabled:
             return L("macControl.closedLid.ready")
@@ -411,6 +446,8 @@ struct MacControlSettingsSection: View {
         allowDisplaySleep = defaults.object(forKey: MacControlPreference.allowDisplaySleep) as? Bool ?? true
         lowBatteryProtection = defaults.object(forKey: MacControlPreference.lowBatteryProtection) as? Bool ?? true
         lowBatteryThreshold = defaults.object(forKey: MacControlPreference.lowBatteryThreshold) as? Int ?? 20
+        closedLidDurationMinutes = defaults.object(forKey: MacControlPreference.closedLidDurationMinutes) as? Int ?? -1
+        closedLidCustomHours = min(48, max(1, defaults.object(forKey: MacControlPreference.closedLidCustomHours) as? Int ?? 2))
         powerAdapterTrigger = defaults.bool(forKey: MacControlPreference.powerAdapterTrigger)
         selectedAppBundleIdentifiers = Set(
             defaults.stringArray(forKey: MacControlPreference.selectedAppBundleIdentifiers) ?? []

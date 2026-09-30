@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="AmorDrop"
 BUNDLE_ID="com.amor.personal.amordrop"
-VERSION="1.2.0"
+VERSION="1.3.0"
 MINIMUM_MACOS_VERSION="15.6"
 SIGNING_IDENTITY="${AMORDROP_SIGNING_IDENTITY:--}"
 OUTPUT_APP_DIR="${AMORDROP_OUTPUT_APP_DIR:-$PWD/build/${APP_NAME}.app}"
@@ -19,7 +19,7 @@ mkdir -p .build/swiftpm-cache .build/swiftpm-config .build/swiftpm-security \
   .build/module-cache .build/clang-module-cache
 export CLANG_MODULE_CACHE_PATH="$PWD/.build/clang-module-cache"
 export SWIFT_MODULECACHE_PATH="$PWD/.build/module-cache"
-BUILD_ARGS=(-c release --arch arm64
+BUILD_ARGS=(--build-system native -c release --arch arm64
   --cache-path .build/swiftpm-cache
   --config-path .build/swiftpm-config
   --security-path .build/swiftpm-security
@@ -58,10 +58,15 @@ cp LICENSE "${APP_DIR}/Contents/Resources/LICENSE"
 
 # These are freshly built local artifacts. File-provider/Finder metadata
 # copied from the source tree must not become part of the signed bundle.
+# Exclude migration backup fragments from the generated app only.
+find "${APP_DIR}" -type f -name '.BC.T_*' -delete
 xattr -cr "${APP_DIR}"
 codesign --force --deep --sign "${SIGNING_IDENTITY}" "${APP_DIR}"
 codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
 mkdir -p "$(dirname "$OUTPUT_APP_DIR")"
+if [[ -d "$OUTPUT_APP_DIR" ]]; then
+  find "$OUTPUT_APP_DIR" -type f -name '.BC.T_*' -delete
+fi
 ditto --noextattr --norsrc "${APP_DIR}" "${OUTPUT_APP_DIR}"
 
 printf 'Built %s\n' "${OUTPUT_APP_DIR}"
