@@ -3,7 +3,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-VERSION="1.3.1"
+VERSION="1.3.2"
 MINIMUM_MACOS_VERSION="15.6"
 ARCH="arm64"
 ARTIFACT_DIR="${1:-/private/tmp}"

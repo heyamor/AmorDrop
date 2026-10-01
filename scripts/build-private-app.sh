@@ -5,7 +5,7 @@ cd "$(dirname "$0")/.."
 
 APP_NAME="AmorDrop"
 BUNDLE_ID="com.amor.personal.amordrop"
-VERSION="1.3.1"
+VERSION="1.3.2"
 MINIMUM_MACOS_VERSION="15.6"
 SIGNING_IDENTITY="${AMORDROP_SIGNING_IDENTITY:--}"
 OUTPUT_APP_DIR="${AMORDROP_OUTPUT_APP_DIR:-$PWD/build/${APP_NAME}.app}"
@@ -39,12 +39,14 @@ RESOURCE_BUNDLE="${BIN_DIR}/AmorDrop_AmorDrop.bundle"
 test -d "${RESOURCE_BUNDLE}"
 cp -R "${RESOURCE_BUNDLE}" "${APP_DIR}/Contents/Resources/"
 cp -R Sources/ShelfDemo/Resources/. "${APP_DIR}/Contents/Resources/"
+# Use a new icon resource name to invalidate macOS icon caches from earlier builds.
+mv "${APP_DIR}/Contents/Resources/AppIcon.icns" "${APP_DIR}/Contents/Resources/AmorDropIcon-1.3.2.icns"
 cp LICENSE "${APP_DIR}/Contents/Resources/LICENSE"
 
 /usr/libexec/PlistBuddy -c "Clear dict" "${APP_DIR}/Contents/Info.plist" 2>/dev/null || true
 /usr/libexec/PlistBuddy -c "Add :CFBundleDevelopmentRegion string en" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleExecutable string ${APP_NAME}" "${APP_DIR}/Contents/Info.plist"
-/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AppIcon.icns" "${APP_DIR}/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Add :CFBundleIconFile string AmorDropIcon-1.3.2.icns" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleIdentifier string ${BUNDLE_ID}" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleInfoDictionaryVersion string 6.0" "${APP_DIR}/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Add :CFBundleName string ${APP_NAME}" "${APP_DIR}/Contents/Info.plist"
@@ -63,6 +65,8 @@ find "${APP_DIR}" -type f -name '.BC.T_*' -delete
 xattr -cr "${APP_DIR}"
 codesign --force --deep --sign "${SIGNING_IDENTITY}" "${APP_DIR}"
 codesign --verify --deep --strict --verbose=2 "${APP_DIR}"
+# Check the packaged app itself, including localization and menu icon resources.
+"${APP_DIR}/Contents/MacOS/${APP_NAME}" --resource-diagnostic
 mkdir -p "$(dirname "$OUTPUT_APP_DIR")"
 if [[ -d "$OUTPUT_APP_DIR" ]]; then
   find "$OUTPUT_APP_DIR" -type f -name '.BC.T_*' -delete

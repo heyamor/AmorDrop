@@ -4,7 +4,7 @@
 
 适用于 Apple Silicon Mac 的原生文件暂存架，基于 [Dropshit](https://github.com/iamsumanp/Dropshit)。
 
-[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.3.1/AmorDrop-macOS15.6-arm64-preview-1.3.1.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
+[下载 macOS 15.6+ 预览版（DMG）](https://github.com/heyamor/AmorDrop/releases/download/amordrop-preview-macos15.6-1.3.2/AmorDrop-macOS15.6-arm64-preview-1.3.2.dmg) · [所有版本](https://github.com/heyamor/AmorDrop/releases)
 
 ## 功能
 
@@ -17,6 +17,8 @@
 ## 安装
 
 需要 Apple Silicon（M 系列）和 macOS 15.6 或更高版本。此版本尚未在 macOS 15.6 实机验证。下载 DMG，打开后将 AmorDrop.app 拖到 Applications 文件夹。
+
+安装后的 App 使用自身携带的资源，不依赖开发项目或移动硬盘；Shelf 引用的源文件若在移动硬盘上，访问文件时仍需连接硬盘。
 
 此预览版使用本机临时签名，未经 Apple 公证，也没有 Developer ID。首次打开若被 macOS 拦截，请先确认 DMG 来自本仓库，再到「系统设置 → 隐私与安全性」选择「仍要打开」。不要关闭 Gatekeeper。
 

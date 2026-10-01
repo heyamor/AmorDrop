@@ -6,6 +6,19 @@ import ServiceManagement
 @main
 struct AmorDropApp {
     static func main() {
+        // Read-only packaging check; also works when the development disk is absent.
+        if CommandLine.arguments.contains("--resource-diagnostic") {
+            LanguagePreference.applyAtLaunch()
+            let resources = AppResources.bundle
+            let icon = resources.url(forResource: "MenuBarIcon", withExtension: "pdf")
+            print("Resource bundle: \(resources.bundleURL.path)")
+            print("Menu icon: \(icon?.path ?? "missing; built-in fallback will be used")")
+            print("Localizations: \(resources.localizations.sorted().joined(separator: ", "))")
+            print("Active localization: \(LanguagePreference.activeBundle().bundleURL.path)")
+            let iconData = icon.flatMap { try? Data(contentsOf: $0) }
+            exit(iconData?.isEmpty == false ? 0 : 1)
+        }
+
         // Must run before any localized lookup — NSBundle reads
         // AppleLanguages once at first resolution.
         LanguagePreference.applyAtLaunch()
@@ -138,16 +151,39 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuDelegate {
     // without needing to install/uninstall the monitor.
     private var outsideClickMonitor: Any?
 
+    // Rasterize once at launch, so subsequent redraws need no filesystem access.
+    private lazy var statusMark: NSImage? = {
+        guard let url = AppResources.bundle.url(forResource: "MenuBarIcon", withExtension: "pdf"),
+              let source = NSImage(contentsOf: url) else { return nil }
+        let image = NSImage(size: NSSize(width: 18, height: 18))
+        image.lockFocus()
+        source.draw(in: NSRect(x: 0, y: 0, width: 18, height: 18))
+        image.unlockFocus()
+        return image
+    }()
+
     private func applyStatusIcon(dropping: Bool? = nil, awake: Bool? = nil) {
         if let dropping { dropTargetActive = dropping }
         if let awake { isKeepAwake = awake }
         guard let button = statusItem?.button else { return }
         let isDropping = dropTargetActive
         let isAwake = isKeepAwake
+        let mark = statusMark
         let image = NSImage(size: NSSize(width: 18, height: 18), flipped: false) { rect in
-            guard let url = Bundle.module.url(forResource: "MenuBarIcon", withExtension: "pdf"),
-                  let mark = NSImage(contentsOf: url) else { return false }
-            mark.draw(in: rect)
+            if let mark {
+                mark.draw(in: rect)
+            } else {
+                // A missing asset must not leave an invisible menu-bar entry.
+                let tray = NSBezierPath(roundedRect: rect.insetBy(dx: 2, dy: 3), xRadius: 2, yRadius: 2)
+                tray.lineWidth = 1.5
+                NSColor.black.setStroke()
+                tray.stroke()
+                let slot = NSBezierPath()
+                slot.move(to: NSPoint(x: 5, y: 9))
+                slot.line(to: NSPoint(x: 13, y: 9))
+                slot.lineWidth = 1.5
+                slot.stroke()
+            }
             // Preserve the existing awake/drop state feedback beside the mark.
             if isAwake || isDropping {
                 let badge = NSBezierPath(ovalIn: NSRect(x: 14.5, y: 14.5, width: 3, height: 3))

@@ -5,7 +5,7 @@ import SwiftUI
 /// .lproj bundle that matches the user's chosen language. We can't rely on
 /// the standard `AppleLanguages` UserDefaults override here because that
 /// override only steers `Bundle.main`'s preferred localizations — SwiftPM's
-/// resource sub-bundle (`Bundle.module`) ignores it and always falls back
+/// resource sub-bundle (`AppResources.bundle`) ignores it and always falls back
 /// to the development localization, so we resolve the lproj manually.
 func L(_ key: String, comment: StaticString = "") -> String {
     let bundle = LanguagePreference.activeBundle()
@@ -79,8 +79,8 @@ enum LanguagePreference {
         _ = activeBundle()
     }
 
-    /// Returns the `.lproj` sub-bundle of `Bundle.module` matching the user's
-    /// chosen language, or `Bundle.module` itself if no override applies (or
+    /// Returns the `.lproj` sub-bundle of `AppResources.bundle` matching the user's
+    /// chosen language, or `AppResources.bundle` itself if no override applies (or
     /// the lproj can't be opened, in which case NSLocalizedString will fall
     /// through to its dev-localization default).
     static func activeBundle() -> Bundle {
@@ -95,7 +95,7 @@ enum LanguagePreference {
     private static var cachedBundle: Bundle?
 
     private static func resolveActiveBundle() -> Bundle {
-        let module = Bundle.module
+        let module = AppResources.bundle
         let code: String
         switch current {
         case .system:
